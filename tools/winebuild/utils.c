@@ -944,6 +944,7 @@ const char *get_asm_export_section(void)
     switch (target.platform)
     {
     case PLATFORM_APPLE:   return ".data";
+    case PLATFORM_WASI:    return ".data";
     case PLATFORM_MINGW:
     case PLATFORM_WINDOWS: return ".section .edata";
     default:               return ".section .data";
@@ -955,6 +956,7 @@ const char *get_asm_rodata_section(void)
     switch (target.platform)
     {
     case PLATFORM_APPLE:   return ".const";
+    case PLATFORM_WASI:    return ".section .rodata,\"\",@";
     case PLATFORM_MINGW:
     case PLATFORM_WINDOWS: return ".section .rdata";
     default:               return ".section .rodata";
@@ -966,6 +968,7 @@ const char *get_asm_rsrc_section(void)
     switch (target.platform)
     {
     case PLATFORM_APPLE:   return ".data";
+    case PLATFORM_WASI:    return ".data";
     case PLATFORM_MINGW:
     case PLATFORM_WINDOWS: return ".section .rsrc";
     default:               return ".section .data";
@@ -977,6 +980,7 @@ const char *get_asm_string_section(void)
     switch (target.platform)
     {
     case PLATFORM_APPLE:   return ".cstring";
+    case PLATFORM_WASI:    return ".section .rodata,\"\",@";
     case PLATFORM_MINGW:
     case PLATFORM_WINDOWS: return ".section .rdata";
     default:               return ".section .rodata";

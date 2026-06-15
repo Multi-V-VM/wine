@@ -983,6 +983,14 @@ static struct strarray get_winebuild_args( const char *target )
         strarray_add( &spec_args, "--target" );
         strarray_add( &spec_args, target );
     }
+    if (target && !strncmp( target, "wasm32-", 7 ))
+    {
+        const char *nm = find_binary( "llvm-nm" );
+
+        if (!nm && !access( "/opt/homebrew/opt/llvm/bin/llvm-nm", X_OK ))
+            nm = "/opt/homebrew/opt/llvm/bin/llvm-nm";
+        if (nm) strarray_add( &spec_args, strmake( "--nm-cmd=%s", nm ));
+    }
     if (force_pointer_size)
         strarray_add(&spec_args, strmake("-m%u", 8 * force_pointer_size ));
     STRARRAY_FOR_EACH( dir, &prefix_dirs )

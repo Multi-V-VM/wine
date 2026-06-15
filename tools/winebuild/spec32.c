@@ -51,6 +51,11 @@ static const char builtin_signature[32] = "Wine builtin DLL";
 static const char fakedll_signature[32] = "Wine placeholder DLL";
 static struct strarray spec_extra_ld_symbols = { 0 }; /* list of extra symbols that ld should resolve */
 
+static void output_wasm_functype( const char *name )
+{
+    output( "\t.functype %s () -> ()\n", asm_name( name ) );
+}
+
 /* add a symbol to the list of extra symbols that ld must resolve */
 void add_spec_extra_ld_symbol( const char *name )
 {
@@ -98,6 +103,7 @@ static int has_relays( struct exports *exports )
 {
     int i;
 
+    if (target.cpu == CPU_WASM32) return 0;
     if (target.cpu == CPU_ARM64EC) return 0;
 
     for (i = exports->base; i <= exports->limit; i++)
@@ -444,6 +450,23 @@ void output_exports( DLLSPEC *spec )
     output( "\t.balign 4\n" );
     output( ".L__wine_spec_exports:\n" );
 
+    if (target.cpu == CPU_WASM32)
+    {
+        for (i = exports->base; i <= exports->limit; i++)
+        {
+            ORDDEF *odp = exports->ordinals[i];
+
+            if (!odp) continue;
+            if (odp->flags & FLAG_FORWARD) continue;
+            if (odp->type == TYPE_STUB) continue;
+            if (odp->type == TYPE_EXTERN) continue;
+            if (odp->flags & FLAG_EXT_LINK)
+                output_wasm_functype( strmake( "%s_%s", asm_name("__wine_spec_ext_link"), odp->link_name ) );
+            else
+                output_wasm_functype( get_link_name( odp ) );
+        }
+    }
+
     /* export directory header */
 
     output( "\t.long 0\n" );                       /* Characteristics */
@@ -732,6 +755,12 @@ void output_module( DLLSPEC *spec )
         output( "__wine_spec_pe_header:\n" );
         output( "\t.skip %u\n", 65536 + page_size );
         break;
+    case PLATFORM_WASI:
+        output( "\n\t.data\n" );
+        output( "\t.balign %u\n", page_size );
+        output( "__wine_spec_pe_header:\n" );
+        output( "\t.skip %u\n", 65536 + page_size );
+        break;
     default:
         output( "\n\t.section \".init\",\"ax\"\n" );
         output( "\tjmp 1f\n" );
@@ -757,6 +786,7 @@ void output_module( DLLSPEC *spec )
     case CPU_x86_64:  machine = IMAGE_FILE_MACHINE_AMD64; break;
     case CPU_ARM:     machine = IMAGE_FILE_MACHINE_ARMNT; break;
     case CPU_ARM64:   machine = IMAGE_FILE_MACHINE_ARM64; break;
+    case CPU_WASM32:  machine = IMAGE_FILE_MACHINE_UNKNOWN; break;
     }
     output( "\t.short 0x%04x\n",          /* Machine */
              machine );
@@ -1175,6 +1205,7 @@ static void output_pe_file( DLLSPEC *spec, const char signature[32] )
     case CPU_x86_64:  put_word( IMAGE_FILE_MACHINE_AMD64 ); break;
     case CPU_ARM:     put_word( IMAGE_FILE_MACHINE_ARMNT ); break;
     case CPU_ARM64:   put_word( IMAGE_FILE_MACHINE_ARM64 ); break;
+    case CPU_WASM32:  put_word( IMAGE_FILE_MACHINE_UNKNOWN ); break;
     }
     put_word( pe.sec_count );                        /* NumberOfSections */
     put_dword( hash_filename(spec->file_name) );     /* TimeDateStamp */

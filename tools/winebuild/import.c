@@ -170,6 +170,20 @@ static const char *get_wasm_import_stub_name( const char *dll_name, unsigned int
     return name;
 }
 
+static int is_wasm_function_export( const ORDDEF *odp )
+{
+    switch (odp->type)
+    {
+    case TYPE_PASCAL:
+    case TYPE_STDCALL:
+    case TYPE_CDECL:
+    case TYPE_VARARGS:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
 /* compare function names; helper for resolve_imports */
 static int name_cmp( const char **name, const char **entry )
 {
@@ -498,6 +512,18 @@ static char *create_undef_symbols_file( DLLSPEC *spec )
     int i;
 
     as_file = open_temp_output_file( ".s" );
+    if (target.cpu == CPU_WASM32)
+    {
+        for (i = 0; i < spec->exports.nb_entry_points; i++)
+        {
+            ORDDEF *odp = spec->exports.entry_points[i];
+            if (!is_wasm_function_export( odp )) continue;
+            if (odp->flags & FLAG_FORWARD) continue;
+            output( "\t.functype %s () -> ()\n", asm_name( get_link_name( odp )));
+        }
+        STRARRAY_FOR_EACH( sym, &extra_ld_symbols )
+            output( "\t.functype %s () -> ()\n", asm_name(sym) );
+    }
     output( "\t.data\n" );
 
     for (i = 0; i < spec->exports.nb_entry_points; i++)
