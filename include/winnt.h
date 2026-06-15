@@ -1273,6 +1273,17 @@ typedef I386_CONTEXT CONTEXT, *PCONTEXT;
 
 typedef I386_FLOATING_SAVE_AREA FLOATING_SAVE_AREA, *PFLOATING_SAVE_AREA;
 typedef I386_CONTEXT CONTEXT, *PCONTEXT;
+typedef struct _IMAGE_WASM32_RUNTIME_FUNCTION_ENTRY
+{
+    DWORD BeginAddress;
+    DWORD EndAddress;
+    DWORD UnwindData;
+} IMAGE_WASM32_RUNTIME_FUNCTION_ENTRY;
+typedef IMAGE_WASM32_RUNTIME_FUNCTION_ENTRY RUNTIME_FUNCTION, *PRUNTIME_FUNCTION;
+typedef struct _KNONVOLATILE_CONTEXT_POINTERS
+{
+    ULONG_PTR Reserved;
+} KNONVOLATILE_CONTEXT_POINTERS, *PKNONVOLATILE_CONTEXT_POINTERS;
 
 #endif  /* __wasm32__ && PROTON_WASM */
 
@@ -2212,6 +2223,30 @@ typedef DISPATCHER_CONTEXT_ARM64 DISPATCHER_CONTEXT, *PDISPATCHER_CONTEXT;
 
 typedef LONG (CALLBACK *PEXCEPTION_FILTER)(struct _EXCEPTION_POINTERS*,DWORD64);
 typedef void (CALLBACK *PTERMINATION_HANDLER)(BOOLEAN,DWORD64);
+
+#define UNW_FLAG_NHANDLER  0
+#define UNW_FLAG_EHANDLER  1
+#define UNW_FLAG_UHANDLER  2
+
+#elif defined(__wasm32__) && defined(PROTON_WASM)
+
+typedef struct _DISPATCHER_CONTEXT
+{
+    ULONG_PTR                     ControlPc;
+    ULONG_PTR                     ImageBase;
+    PRUNTIME_FUNCTION             FunctionEntry;
+    ULONG_PTR                     EstablisherFrame;
+    ULONG_PTR                     TargetPc;
+    PCONTEXT                      ContextRecord;
+    PEXCEPTION_ROUTINE            LanguageHandler;
+    PVOID                         HandlerData;
+    struct _UNWIND_HISTORY_TABLE *HistoryTable;
+    DWORD                         ScopeIndex;
+    DWORD                         Reserved;
+} DISPATCHER_CONTEXT, *PDISPATCHER_CONTEXT;
+
+typedef LONG (CALLBACK *PEXCEPTION_FILTER)(struct _EXCEPTION_POINTERS*,DWORD);
+typedef void (CALLBACK *PTERMINATION_HANDLER)(BOOLEAN,DWORD);
 
 #define UNW_FLAG_NHANDLER  0
 #define UNW_FLAG_EHANDLER  1
@@ -7590,6 +7625,10 @@ static FORCEINLINE DECLSPEC_NORETURN void __fastfail(unsigned int code)
 #elif defined(__arm__)
     register ULONG_PTR val __asm__("r0") = code;
     for (;;) __asm__ __volatile__( "udf #0xfb" :: "r" (val) : "memory" );
+#elif defined(__wasm32__) && defined(PROTON_WASM)
+    (void)code;
+    __builtin_trap();
+    for (;;) {}
 #endif
 }
 

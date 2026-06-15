@@ -791,6 +791,8 @@ void output_function_header( const char *func, int global )
 /* output a size declaration for an assembly function */
 void output_function_size( const char *name )
 {
+    if (target.cpu == CPU_WASM32) return;
+
     switch (target.platform)
     {
     case PLATFORM_APPLE:
@@ -883,6 +885,8 @@ void output_thunk_rva( int ordinal, const char *format, ... )
 /* output the GNU note for non-exec stack */
 void output_gnu_stack_note(void)
 {
+    if (target.cpu == CPU_WASM32) return;
+
     switch (target.platform)
     {
     case PLATFORM_MINGW:

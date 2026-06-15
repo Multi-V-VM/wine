@@ -232,6 +232,23 @@ __ASM_GLOBAL_FUNC( __wine_longjmp,
                    "mov x0, x1\n\t"                /* retval */
                    "ret" )
 
+#elif defined(__wasm32__) && defined(PROTON_WASM)
+
+int __cdecl __wine_setjmpex( __wine_jmp_buf *buf, EXCEPTION_REGISTRATION_RECORD *frame )
+{
+    (void)buf;
+    (void)frame;
+    return 0;
+}
+
+void __cdecl __wine_longjmp( __wine_jmp_buf *buf, int retval )
+{
+    (void)buf;
+    (void)retval;
+    __builtin_trap();
+    for (;;) {}
+}
+
 #else
 
 int __cdecl __wine_setjmpex( __wine_jmp_buf *buf, EXCEPTION_REGISTRATION_RECORD *frame )

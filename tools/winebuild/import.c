@@ -153,6 +153,23 @@ static struct strarray as_files;
 static const char import_func_prefix[] = "__wine$func$";
 static const char import_ord_prefix[]  = "__wine$ord$";
 
+static void output_wasm_trap_function_body( const char *name )
+{
+    output( "\t.functype %s () -> ()\n", asm_name( name ) );
+    output( "\tunreachable\n" );
+    output( "\tend_function\n" );
+}
+
+static const char *get_wasm_import_stub_name( const char *dll_name, unsigned int ordinal )
+{
+    char *p, *name = strmake( "__wine_wasm_import_%s_%u", dll_name, ordinal );
+
+    for (p = name; *p; p++)
+        if (!isalnum( *p ) && *p != '_') *p = '_';
+
+    return name;
+}
+
 /* compare function names; helper for resolve_imports */
 static int name_cmp( const char **name, const char **entry )
 {
@@ -1132,6 +1149,9 @@ void output_stubs( DLLSPEC *spec )
             output( "\tb %s\n", arm64_name("__wine_spec_unimplemented_stub") );
             output( "\t.seh_endproc\n" );
             break;
+        case CPU_WASM32:
+            output_wasm_trap_function_body( name );
+            break;
         }
         output_function_size( name );
     }
@@ -1625,14 +1645,24 @@ static void build_unix_import_lib( DLLSPEC *spec, struct strarray files )
         case TYPE_VARARGS:
         case TYPE_CDECL:
         case TYPE_STDCALL:
+        {
+            const char *asm_func_name = name;
+
             prefix = (!odp->name || (odp->flags & FLAG_ORDINAL)) ? import_ord_prefix : import_func_prefix;
+            if (target.cpu == CPU_WASM32)
+                asm_func_name = get_wasm_import_stub_name( dll_name, odp->ordinal );
+
             new_output_as_file();
-            output_function_header( name, 1 );
-            output( "\t%s %s%s$%u$%s\n", get_asm_ptr_keyword(),
-                    asm_name( prefix ), dll_name, odp->ordinal, name );
-            output_function_size( name );
+            output_function_header( asm_func_name, 1 );
+            if (target.cpu == CPU_WASM32)
+                output_wasm_trap_function_body( asm_func_name );
+            else
+                output( "\t%s %s%s$%u$%s\n", get_asm_ptr_keyword(),
+                        asm_name( prefix ), dll_name, odp->ordinal, name );
+            output_function_size( asm_func_name );
             output_gnu_stack_note();
             break;
+        }
 
         default:
             break;

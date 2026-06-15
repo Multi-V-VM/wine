@@ -408,6 +408,11 @@ static struct strarray build_tool_name( const char *target_name, struct tool_nam
     const char *path, *str;
     struct strarray ret;
 
+    if (target_name && !strncmp( target_name, "wasm32-", 7 ) && !strcmp( tool.base, "ld" ))
+    {
+        if ((path = find_binary( "wasm-ld" ))) return strarray_fromstring( path, " " );
+    }
+
     if (target_name && target_version)
         str = strmake( "%s-%s-%s", target_name, tool.base, target_version );
     else if (target_name)
@@ -2041,7 +2046,7 @@ int main(int argc, char **argv)
 
     if (!file_align) file_align = section_align;
 
-    if (!is_pe && target.cpu != CPU_i386 && target.cpu != CPU_x86_64)
+    if (!is_pe && target.cpu != CPU_i386 && target.cpu != CPU_x86_64 && target.cpu != CPU_WASM32)
         error( "Non-PE builds are not supported on this platform. You need to use something like '--target=%s-windows'.\n",
                target.cpu == CPU_ARM ? "arm" : "aarch64" );
 

@@ -24,6 +24,35 @@
 
 #include "config.h"
 
+#ifdef PROTON_WASM
+
+#include "ntstatus.h"
+#define WIN32_NO_STATUS
+#include "windef.h"
+#include "winternl.h"
+
+#include "unixlib.h"
+
+static NTSTATUS init( void *args )
+{
+    (void)args;
+    return STATUS_NOT_SUPPORTED;
+}
+
+static NTSTATUS get_device_info( void *args )
+{
+    (void)args;
+    return STATUS_NOT_FOUND;
+}
+
+const unixlib_entry_t __wine_unix_call_funcs[] =
+{
+    init,
+    get_device_info,
+};
+
+#else
+
 #include <stdarg.h>
 #include <stdlib.h>
 #include <dlfcn.h>
@@ -281,3 +310,5 @@ const unixlib_entry_t __wine_unix_call_funcs[] =
     init,
     get_device_info,
 };
+
+#endif
