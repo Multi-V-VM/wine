@@ -429,7 +429,12 @@ static struct strarray build_tool_name( const char *target_name, struct tool_nam
     else
         str = tool.llvm_base;
 
-    if (!(path = find_binary( str ))) error( "Could not find %s\n", tool.base );
+    if (target_name && !strncmp( target_name, "wasm32-", 7 ) &&
+        !strncmp( tool.llvm_base, "clang", 5 ) &&
+        !access( "/opt/homebrew/opt/llvm/bin/clang", X_OK ))
+        path = "/opt/homebrew/opt/llvm/bin/clang";
+    else if (!(path = find_binary( str )))
+        error( "Could not find %s\n", tool.base );
 
     ret = strarray_fromstring( path, " " );
     if (!strncmp( tool.llvm_base, "clang", 5 ))
@@ -503,6 +508,7 @@ static struct strarray get_link_args( const char *output_name )
     char *version;
 
     strarray_addall( &link_args, linker_args );
+    if (nodefaultlibs || target.cpu == CPU_WASM32) strarray_add( &link_args, "-nodefaultlibs" );
 
     if (verbose > 1) strarray_add( &flags, "-v" );
 

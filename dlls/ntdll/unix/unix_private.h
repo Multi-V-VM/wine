@@ -22,6 +22,9 @@
 #define __NTDLL_UNIX_PRIVATE_H
 
 #include <pthread.h>
+#ifdef PROTON_WASM
+# define _WASI_EMULATED_SIGNAL
+#endif
 #include <signal.h>
 #include "unixlib.h"
 #include "wine/unixlib.h"
@@ -49,6 +52,8 @@ static const WORD current_machine = IMAGE_FILE_MACHINE_AMD64;
 static const WORD current_machine = IMAGE_FILE_MACHINE_ARMNT;
 #elif defined(__aarch64__)
 static const WORD current_machine = IMAGE_FILE_MACHINE_ARM64;
+#elif defined(__wasm32__)
+static const WORD current_machine = IMAGE_FILE_MACHINE_I386;
 #endif
 extern WORD native_machine;
 

@@ -413,6 +413,15 @@ __ASM_STDCALL_IMPORT(RaiseException,16)
 __ASM_GLOBAL_IMPORT(RaiseException)
 #endif
 
+static inline void *get_builtin_return_address(void)
+{
+#if defined(__wasm32__) && defined(PROTON_WASM)
+    return NULL;
+#else
+    return __builtin_return_address(0);
+#endif
+}
+
 /*******************************************************************
  *           RaiseFailFastException  (kernelbase.@)
  */
@@ -436,13 +445,13 @@ void WINAPI DECLSPEC_HOTPATCH RaiseFailFastException( EXCEPTION_RECORD *record, 
         rec.ExceptionCode    = STATUS_FAIL_FAST_EXCEPTION;
         rec.ExceptionFlags   = EXCEPTION_NONCONTINUABLE;
         rec.ExceptionRecord  = NULL;
-        rec.ExceptionAddress = __builtin_return_address(0);
+        rec.ExceptionAddress = get_builtin_return_address();
         rec.NumberParameters = 0;
         record = &rec;
     }
     else if (flags & FAIL_FAST_GENERATE_EXCEPTION_ADDRESS)
     {
-        record->ExceptionAddress = __builtin_return_address(0);
+        record->ExceptionAddress = get_builtin_return_address();
     }
 
     for (;;) NtRaiseException( record, context, FALSE );

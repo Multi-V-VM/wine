@@ -1207,6 +1207,10 @@ NTSTATUS WINAPI NtSaveKey( HANDLE key, HANDLE file )
     }
 
     if ((ret = server_get_unix_fd( file, FILE_WRITE_DATA, &fd, &needs_close, NULL, NULL ))) goto done;
+#ifdef PROTON_WASM
+    ret = STATUS_NOT_IMPLEMENTED;
+    goto done;
+#else
     if ((fd2 = dup( fd )) == -1)
     {
         ret = errno_to_status( errno );
@@ -1220,6 +1224,7 @@ NTSTATUS WINAPI NtSaveKey( HANDLE key, HANDLE file )
     }
     save_all_subkeys( data, f );
     if (fclose(f)) ret = errno_to_status( errno );
+#endif
 
 done:
     if (needs_close) close( fd );

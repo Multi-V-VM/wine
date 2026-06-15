@@ -47,6 +47,16 @@ NTSYSAPI NTSTATUS ntdll_get_unix_file_name( const WCHAR *dos, char **unix_name, 
 
 /* exception handling */
 
+#ifdef PROTON_WASM
+
+static inline void ntdll_set_exception_jmp_buf( void *jmp ) { (void)jmp; }
+
+#define __TRY do
+#define __EXCEPT while (0); if (0) do
+#define __ENDTRY while (0);
+
+#else
+
 #include <setjmp.h>
 
 NTSYSAPI void ntdll_set_exception_jmp_buf( jmp_buf jmp );
@@ -74,6 +84,8 @@ NTSYSAPI void ntdll_set_exception_jmp_buf( jmp_buf jmp );
              __first = 0; \
          } \
     } while (0);
+
+#endif
 
 NTSYSAPI BOOLEAN KeAddSystemServiceTable( ULONG_PTR *funcs, ULONG_PTR *counters, ULONG limit,
                                           BYTE *arguments, ULONG index );

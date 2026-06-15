@@ -198,6 +198,8 @@ static struct graphics_driver *create_driver( HMODULE module )
 
 #ifdef __i386__
 static const WCHAR printer_env[] = L"w32x86";
+#elif defined(__wasm32__) && defined(PROTON_WASM)
+static const WCHAR printer_env[] = L"w32x86";
 #elif defined __x86_64__
 static const WCHAR printer_env[] = L"x64";
 #elif defined __arm__

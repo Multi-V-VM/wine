@@ -475,6 +475,8 @@ static void check_undefined_exports( DLLSPEC *spec )
 {
     int i;
 
+    if (target.cpu == CPU_WASM32) return;
+
     for (i = 0; i < spec->exports.nb_entry_points; i++)
     {
         ORDDEF *odp = spec->exports.entry_points[i];

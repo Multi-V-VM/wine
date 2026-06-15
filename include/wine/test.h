@@ -28,6 +28,40 @@
 #include <winbase.h>
 #include <wine/debug.h>
 
+#ifdef PROTON_WASM
+static inline BOOL __wine_wasm_wcstok_isdelim( WCHAR ch, const WCHAR *delim )
+{
+    while (*delim) if (ch == *delim++) return TRUE;
+    return FALSE;
+}
+
+static inline WCHAR *__wine_wasm_wcstok_impl( WCHAR *str, const WCHAR *delim, WCHAR **ctx )
+{
+    static WCHAR *next;
+    WCHAR *end;
+
+    if (!ctx) ctx = &next;
+    if (!str) str = *ctx;
+    if (!str) return NULL;
+    while (*str && __wine_wasm_wcstok_isdelim( *str, delim )) str++;
+    if (!*str)
+    {
+        *ctx = NULL;
+        return NULL;
+    }
+    end = str;
+    while (*end && !__wine_wasm_wcstok_isdelim( *end, delim )) end++;
+    if (*end) *end++ = 0;
+    *ctx = end;
+    return str;
+}
+
+#define __wine_wasm_wcstok2(str, delim) __wine_wasm_wcstok_impl( (str), (delim), NULL )
+#define __wine_wasm_wcstok3(str, delim, ctx) __wine_wasm_wcstok_impl( (str), (delim), (ctx) )
+#define __wine_wasm_wcstok_select(_1, _2, _3, name, ...) name
+#define wcstok(...) __wine_wasm_wcstok_select( __VA_ARGS__, __wine_wasm_wcstok3, __wine_wasm_wcstok2 )( __VA_ARGS__ )
+#endif
+
 #ifndef INVALID_FILE_ATTRIBUTES
 #define INVALID_FILE_ATTRIBUTES  (~0u)
 #endif

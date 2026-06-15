@@ -24,6 +24,10 @@
 
 #include "config.h"
 
+#ifdef PROTON_WASM
+# define _WASI_EMULATED_SIGNAL
+#endif
+
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
@@ -43,9 +47,17 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
-#include <sys/mman.h>
+#ifdef PROTON_WASM
+# define PROT_READ  0x01
+# define PROT_WRITE 0x02
+# define MAP_FAILED ((void *)-1)
+#else
+# include <sys/mman.h>
+#endif
 #include <sys/socket.h>
-#include <sys/wait.h>
+#ifndef PROTON_WASM
+# include <sys/wait.h>
+#endif
 #ifdef HAVE_SYS_UN_H
 #include <sys/un.h>
 #endif
@@ -82,6 +94,18 @@
 #include "ddk/wdm.h"
 
 #include "fsync.h"
+
+#ifdef PROTON_WASM
+# define SIG_BLOCK   0
+# define SIG_SETMASK 1
+# define pthread_sigmask(how, set, oldset) 0
+# ifndef SIGIO
+#  define SIGIO 0
+# endif
+# ifndef SIGCHLD
+#  define SIGCHLD 0
+# endif
+#endif
 
 WINE_DEFAULT_DEBUG_CHANNEL(server);
 WINE_DECLARE_DEBUG_CHANNEL(syscall);
@@ -952,6 +976,9 @@ unsigned int server_queue_process_apc( HANDLE process, const union apc_call *cal
  */
 void CDECL wine_server_send_fd( int fd )
 {
+#ifdef PROTON_WASM
+    server_protocol_error( "sending file descriptors to wineserver is not available in the WASI build\n" );
+#else
     struct send_fd data;
     struct msghdr msghdr;
     struct iovec vec;
@@ -988,6 +1015,7 @@ void CDECL wine_server_send_fd( int fd )
         if (errno == EPIPE) abort_thread(0);
         server_protocol_perror( "sendmsg" );
     }
+#endif
 }
 
 
@@ -998,6 +1026,10 @@ void CDECL wine_server_send_fd( int fd )
  */
 int wine_server_receive_fd( obj_handle_t *handle )
 {
+#ifdef PROTON_WASM
+    server_protocol_error( "receiving file descriptors from wineserver is not available in the WASI build\n" );
+    return -1;
+#else
     struct iovec vec;
     struct msghdr msghdr;
     char cmsg_buffer[256];
@@ -1041,6 +1073,7 @@ int wine_server_receive_fd( obj_handle_t *handle )
     }
     /* the server closed the connection; time to die... */
     abort_thread(0);
+#endif
 }
 
 
@@ -1266,7 +1299,11 @@ NTSTATUS CDECL wine_server_handle_to_fd( HANDLE handle, unsigned int access, int
 
     if (!ret && !needs_close)
     {
+#ifdef PROTON_WASM
+        ret = STATUS_NOT_IMPLEMENTED;
+#else
         if ((*unix_fd = dup(*unix_fd)) == -1) ret = STATUS_TOO_MANY_OPENED_FILES;
+#endif
     }
     return ret;
 }
@@ -1290,6 +1327,10 @@ NTSTATUS unixcall_wine_server_handle_to_fd( void *args )
  */
 int server_pipe( int fd[2] )
 {
+#ifdef PROTON_WASM
+    errno = ENOSYS;
+    return -1;
+#else
     int ret;
 #ifdef HAVE_PIPE2
     static BOOL have_pipe2 = TRUE;
@@ -1306,6 +1347,7 @@ int server_pipe( int fd[2] )
         fcntl( fd[1], F_SETFD, FD_CLOEXEC );
     }
     return ret;
+#endif
 }
 
 
@@ -1314,6 +1356,9 @@ int server_pipe( int fd[2] )
  */
 static const char *init_server_dir( dev_t dev, ino_t ino )
 {
+#ifdef PROTON_WASM
+    return "/tmp/.wine-wasm/server";
+#else
     char *dir = NULL;
 
 #ifdef __ANDROID__  /* there's no /tmp dir on Android */
@@ -1322,6 +1367,7 @@ static const char *init_server_dir( dev_t dev, ino_t ino )
     asprintf( &dir, "/tmp/.wine-%u/server-%llx-%llx", getuid(), (unsigned long long)dev, (unsigned long long)ino );
 #endif
     return dir;
+#endif
 }
 
 
@@ -1332,6 +1378,10 @@ static const char *init_server_dir( dev_t dev, ino_t ino )
  */
 static int setup_config_dir(void)
 {
+#ifdef PROTON_WASM
+    fatal_error( "Wine config directories are not available in the WASI build\n" );
+    return -1;
+#else
     char *p;
     struct stat st;
     int fd_cwd = open( ".", O_RDONLY );
@@ -1369,6 +1419,7 @@ static int setup_config_dir(void)
     if (fd_cwd == -1) fd_cwd = open( "dosdevices/c:", O_RDONLY );
     fcntl( fd_cwd, F_SETFD, FD_CLOEXEC );
     return fd_cwd;
+#endif
 }
 
 
@@ -1380,6 +1431,9 @@ static int setup_config_dir(void)
  */
 static void server_connect_error( const char *serverdir )
 {
+#ifdef PROTON_WASM
+    fatal_error( "wineserver sockets are not available in the WASI build\n" );
+#else
     int fd;
     struct flock fl;
 
@@ -1402,6 +1456,7 @@ static void server_connect_error( const char *serverdir )
           "   and there is a 'socket' file in that directory that prevents wine from starting.\n"
           "   You should make sure no wine server is running, remove that file and try again.\n",
                  serverdir );
+#endif
 }
 
 
@@ -1412,6 +1467,10 @@ static void server_connect_error( const char *serverdir )
  */
 static int server_connect(void)
 {
+#ifdef PROTON_WASM
+    fatal_error( "wineserver sockets are not available in the WASI build\n" );
+    return -1;
+#else
     struct sockaddr_un addr;
     struct stat st;
     int s, slen, retry;
@@ -1477,6 +1536,7 @@ static int server_connect(void)
         close( s );
     }
     server_connect_error( server_dir );
+#endif
 }
 
 
@@ -1567,6 +1627,10 @@ static int get_unix_tid(void)
  */
 static int init_thread_pipe(void)
 {
+#ifdef PROTON_WASM
+    server_protocol_error( "thread server pipes are not available in the WASI build\n" );
+    return -1;
+#else
     int reply_pipe[2];
     stack_t ss;
 
@@ -1581,6 +1645,7 @@ static int init_thread_pipe(void)
     wine_server_send_fd( ntdll_get_thread_data()->wait_fd[1] );
     ntdll_get_thread_data()->reply_fd = reply_pipe[0];
     return reply_pipe[1];
+#endif
 }
 
 
@@ -1603,6 +1668,10 @@ void process_exit_wrapper( int status )
  */
 size_t server_init_process(void)
 {
+#ifdef PROTON_WASM
+    fatal_error( "wineserver process initialization is not available in the WASI build\n" );
+    return 0;
+#else
     struct cpu_topology_override *cpu_override;
     const char *arch = getenv( "WINEARCH" );
     const char *env_socket = getenv( "WINESERVERSOCKET" );
@@ -1744,6 +1813,7 @@ size_t server_init_process(void)
         if (supported_machines[i] == current_machine) return info_size;
 
     fatal_error( "wineserver doesn't support the %04x architecture\n", current_machine );
+#endif
 }
 
 

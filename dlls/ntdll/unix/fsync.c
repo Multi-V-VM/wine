@@ -25,6 +25,111 @@
 
 #include "config.h"
 
+#ifdef PROTON_WASM
+
+#include <pthread.h>
+
+#include "ntstatus.h"
+#define WIN32_NO_STATUS
+#include "windef.h"
+#include "winternl.h"
+
+#include "fsync.h"
+
+int fsync_enabled;
+
+void fsync_init( DWORD pid )
+{
+    (void)pid;
+    fsync_enabled = 0;
+}
+
+NTSTATUS fsync_close( HANDLE handle )
+{
+    (void)handle;
+    return STATUS_SUCCESS;
+}
+
+NTSTATUS fsync_release_semaphore( HANDLE handle, ULONG count, ULONG *prev )
+{
+    (void)handle;
+    (void)count;
+    (void)prev;
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+NTSTATUS fsync_query_semaphore( HANDLE handle, void *info )
+{
+    (void)handle;
+    (void)info;
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+NTSTATUS fsync_set_event( HANDLE handle, LONG *prev )
+{
+    (void)handle;
+    (void)prev;
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+NTSTATUS fsync_reset_event( HANDLE handle, LONG *prev )
+{
+    (void)handle;
+    (void)prev;
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+NTSTATUS fsync_pulse_event( HANDLE handle, LONG *prev )
+{
+    (void)handle;
+    (void)prev;
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+NTSTATUS fsync_query_event( HANDLE handle, void *info )
+{
+    (void)handle;
+    (void)info;
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+NTSTATUS fsync_release_mutex( HANDLE handle, LONG *prev )
+{
+    (void)handle;
+    (void)prev;
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+NTSTATUS fsync_query_mutex( HANDLE handle, void *info )
+{
+    (void)handle;
+    (void)info;
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+NTSTATUS fsync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_any,
+                             BOOLEAN alertable, const LARGE_INTEGER *timeout )
+{
+    (void)count;
+    (void)handles;
+    (void)wait_any;
+    (void)alertable;
+    (void)timeout;
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+NTSTATUS fsync_signal_and_wait( HANDLE signal, HANDLE wait, BOOLEAN alertable,
+                                const LARGE_INTEGER *timeout )
+{
+    (void)signal;
+    (void)wait;
+    (void)alertable;
+    (void)timeout;
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+#else
+
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -1236,3 +1341,5 @@ NTSTATUS fsync_signal_and_wait( HANDLE signal, HANDLE wait, BOOLEAN alertable,
 
     return fsync_wait_objects( 1, &wait, TRUE, alertable, timeout );
 }
+
+#endif /* PROTON_WASM */

@@ -162,6 +162,8 @@ struct cpu*             dbghelp_current_cpu =
     &cpu_arm
 #elif defined(__aarch64__)
     &cpu_arm64
+#elif defined(__wasm32__) && defined(PROTON_WASM)
+    &cpu_i386
 #else
 #error define support for your CPU
 #endif

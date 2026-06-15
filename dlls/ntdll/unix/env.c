@@ -1415,12 +1415,14 @@ static void get_initial_console( RTL_USER_PROCESS_PARAMETERS *params )
 
     if (output_fd != -1)
     {
+#ifndef PROTON_WASM
         struct winsize size;
         if (!ioctl( output_fd, TIOCGWINSZ, &size ))
         {
             params->dwXCountChars = size.ws_col;
             params->dwYCountChars = size.ws_row;
         }
+#endif
     }
 }
 

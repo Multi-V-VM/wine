@@ -534,6 +534,8 @@ static const struct
         {
 #if defined __i386__
             IMAGE_FILE_MACHINE_I386, /* Machine */
+#elif defined(__wasm32__) && defined(PROTON_WASM)
+            IMAGE_FILE_MACHINE_I386, /* Machine */
 #elif defined __x86_64__
             IMAGE_FILE_MACHINE_AMD64, /* Machine */
 #elif defined __arm__

@@ -139,7 +139,7 @@ static const char *po_dir;
 static const char *sysroot = "";
 static const char *bindir;
 static const char *includedir;
-const char *nlsdirs[3] = { NULL, DATADIR "/wine/nls", NULL };
+const char *nlsdirs[4] = { NULL, "nls", DATADIR "/wine/nls", NULL };
 
 int line_number = 1;		/* The current line */
 int char_number = 1;		/* The current char pos within the line */

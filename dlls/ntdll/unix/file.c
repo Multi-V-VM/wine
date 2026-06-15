@@ -2935,7 +2935,10 @@ NTSTATUS WINAPI NtQueryDirectoryFile( HANDLE handle, HANDLE event, PIO_APC_ROUTI
                                       FILE_INFORMATION_CLASS info_class, BOOLEAN single_entry,
                                       UNICODE_STRING *mask, BOOLEAN restart_scan )
 {
-    int cwd, fd, needs_close;
+    int fd, needs_close;
+#ifndef PROTON_WASM
+    int cwd;
+#endif
     enum server_fd_type type;
     struct dir_data *data;
     unsigned int status;
@@ -2994,6 +2997,9 @@ NTSTATUS WINAPI NtQueryDirectoryFile( HANDLE handle, HANDLE event, PIO_APC_ROUTI
 
     mutex_lock( &dir_mutex );
 
+#ifdef PROTON_WASM
+    status = STATUS_NOT_IMPLEMENTED;
+#else
     cwd = open( ".", O_RDONLY );
     if (fchdir( fd ) != -1)
     {
@@ -3014,13 +3020,16 @@ NTSTATUS WINAPI NtQueryDirectoryFile( HANDLE handle, HANDLE event, PIO_APC_ROUTI
         if (cwd == -1 || fchdir( cwd ) == -1) chdir( "/" );
     }
     else status = errno_to_status( errno );
+#endif
 
     if (status != STATUS_NO_SUCH_FILE) io->Status = status;
 
     mutex_unlock( &dir_mutex );
 
     if (needs_close) close( fd );
+#ifndef PROTON_WASM
     if (cwd != -1) close( cwd );
+#endif
     TRACE( "=> %x (%ld)\n", status, io->Information );
     return status;
 }
@@ -3394,8 +3403,12 @@ void init_files(void)
     ignore_file( "/sys" );
 #endif
     /* retrieve initial umask */
+#ifdef PROTON_WASM
+    start_umask = 0;
+#else
     start_umask = umask( 0777 );
     umask( start_umask );
+#endif
 
     if (!open_hkcu_key( "Software\\Wine", &key ))
     {
@@ -7982,6 +7995,7 @@ NTSTATUS WINAPI NtQueryVolumeInformationFile( HANDLE handle, IO_STATUS_BLOCK *io
         if (!get_mountmgr_fs_info( handle, fd, &drive, sizeof(drive) )) fs_type = drive.fs_type;
         else
         {
+#ifndef PROTON_WASM
             struct statfs stfs;
 
             if (!fstatfs( fd, &stfs ))
@@ -8010,6 +8024,7 @@ NTSTATUS WINAPI NtQueryVolumeInformationFile( HANDLE handle, IO_STATUS_BLOCK *io
                     fs_type = MOUNTMGR_FS_TYPE_FAT32;
 #endif
             }
+#endif
         }
 
         switch (fs_type)

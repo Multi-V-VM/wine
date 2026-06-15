@@ -26,6 +26,35 @@
 
 #include "config.h"
 
+#ifdef PROTON_WASM
+
+#include <stdarg.h>
+
+#include "ntstatus.h"
+#define WIN32_NO_STATUS
+#include "windef.h"
+#include "winternl.h"
+#include "winioctl.h"
+#include "unix_private.h"
+#include "wine/debug.h"
+
+WINE_DEFAULT_DEBUG_CHANNEL(comm);
+
+NTSTATUS serial_DeviceIoControl( HANDLE device, HANDLE event, PIO_APC_ROUTINE apc, void *apc_user,
+                                 IO_STATUS_BLOCK *io, UINT code, void *in_buffer,
+                                 UINT in_size, void *out_buffer, UINT out_size )
+{
+    FIXME( "serial device ioctls are not available in the WASI build\n" );
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+NTSTATUS serial_FlushBuffersFile( int fd )
+{
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+#else
+
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
@@ -1485,3 +1514,5 @@ NTSTATUS serial_FlushBuffersFile( int fd )
     return STATUS_NOT_IMPLEMENTED;
 #endif
 }
+
+#endif /* PROTON_WASM */

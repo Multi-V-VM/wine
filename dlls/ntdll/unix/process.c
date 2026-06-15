@@ -27,7 +27,9 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <signal.h>
+#ifndef PROTON_WASM
+# include <signal.h>
+#endif
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,7 +41,9 @@
 # include <sys/times.h>
 #endif
 #include <sys/types.h>
-#include <sys/wait.h>
+#ifndef PROTON_WASM
+# include <sys/wait.h>
+#endif
 #ifdef HAVE_SYS_SYSCTL_H
 # include <sys/sysctl.h>
 #endif
@@ -377,6 +381,9 @@ done:
  */
 static void set_stdio_fd( int stdin_fd, int stdout_fd )
 {
+#ifdef PROTON_WASM
+    return;
+#else
     int fd = -1;
 
     if (stdin_fd == -1 || stdout_fd == -1)
@@ -389,6 +396,7 @@ static void set_stdio_fd( int stdin_fd, int stdout_fd )
     if (stdin_fd != 0) dup2( stdin_fd, 0 );
     if (stdout_fd != 1) dup2( stdout_fd, 1 );
     if (fd != -1) close( fd );
+#endif
 }
 
 
@@ -407,6 +415,9 @@ static BOOL is_unix_console_handle( HANDLE handle )
 static NTSTATUS spawn_process( const RTL_USER_PROCESS_PARAMETERS *params, int socketfd,
                                int unixdir, char *winedebug, const struct pe_image_info *pe_info )
 {
+#ifdef PROTON_WASM
+    return STATUS_NOT_IMPLEMENTED;
+#else
     NTSTATUS status = STATUS_SUCCESS;
     int stdin_fd = -1, stdout_fd = -1;
     pid_t pid;
@@ -465,6 +476,7 @@ static NTSTATUS spawn_process( const RTL_USER_PROCESS_PARAMETERS *params, int so
     if (stdin_fd != -1 && stdin_fd != 0) close( stdin_fd );
     if (stdout_fd != -1 && stdout_fd != 1) close( stdout_fd );
     return status;
+#endif
 }
 
 
@@ -473,6 +485,9 @@ static NTSTATUS spawn_process( const RTL_USER_PROCESS_PARAMETERS *params, int so
  */
 NTSTATUS WINAPI __wine_unix_spawnvp( char * const argv[], int wait )
 {
+#ifdef PROTON_WASM
+    return STATUS_NOT_IMPLEMENTED;
+#else
     pid_t pid, wret;
     int fd[2], status, err;
 
@@ -518,6 +533,7 @@ NTSTATUS WINAPI __wine_unix_spawnvp( char * const argv[], int wait )
 
     close( fd[0] );
     return err;
+#endif
 }
 
 
@@ -567,6 +583,9 @@ NTSTATUS wow64_wine_spawnvp( void *args )
 static NTSTATUS fork_and_exec( OBJECT_ATTRIBUTES *attr, const char *unix_name, int unixdir,
                                const RTL_USER_PROCESS_PARAMETERS *params )
 {
+#ifdef PROTON_WASM
+    return STATUS_NOT_IMPLEMENTED;
+#else
     pid_t pid;
     int fd[2], stdin_fd = -1, stdout_fd = -1;
     char **argv;
@@ -655,6 +674,7 @@ static NTSTATUS fork_and_exec( OBJECT_ATTRIBUTES *attr, const char *unix_name, i
     if (stdin_fd != -1 && stdin_fd != 0) close( stdin_fd );
     if (stdout_fd != -1 && stdout_fd != 1) close( stdout_fd );
     return status;
+#endif
 }
 
 static NTSTATUS alloc_handle_list( const PS_ATTRIBUTE *handles_attr, obj_handle_t **handles, data_size_t *handles_len )
@@ -690,6 +710,9 @@ NTSTATUS WINAPI NtCreateUserProcess( HANDLE *process_handle_ptr, HANDLE *thread_
                                      RTL_USER_PROCESS_PARAMETERS *params, PS_CREATE_INFO *info,
                                      PS_ATTRIBUTE_LIST *ps_attr )
 {
+#ifdef PROTON_WASM
+    return STATUS_NOT_IMPLEMENTED;
+#else
     unsigned int status;
     BOOL success = FALSE;
     HANDLE file_handle, process_info = 0, process_handle = 0, thread_handle = 0;
@@ -960,6 +983,7 @@ done:
     free( unix_name );
     free( nt_name.Buffer );
     return status;
+#endif
 }
 
 BOOL terminate_process_running;
@@ -1350,6 +1374,7 @@ NTSTATUS WINAPI NtQueryInformationProcess( HANDLE handle, PROCESSINFOCLASS class
                 else if (!handle) ret = STATUS_INVALID_HANDLE;
                 else
                 {
+#ifndef PROTON_WASM
                     long ticks = sysconf(_SC_CLK_TCK);
                     struct tms tms;
 
@@ -1359,6 +1384,7 @@ NTSTATUS WINAPI NtQueryInformationProcess( HANDLE handle, PROCESSINFOCLASS class
                         pti.UserTime.QuadPart = (ULONGLONG)tms.tms_utime * 10000000 / ticks;
                         pti.KernelTime.QuadPart = (ULONGLONG)tms.tms_stime * 10000000 / ticks;
                     }
+#endif
 
                     SERVER_START_REQ(get_process_info)
                     {

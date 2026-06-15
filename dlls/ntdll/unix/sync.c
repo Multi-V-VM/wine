@@ -27,6 +27,10 @@
 
 #include "config.h"
 
+#ifdef PROTON_WASM
+# define _WASI_EMULATED_SIGNAL
+#endif
+
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -35,7 +39,14 @@
 #include <signal.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>
-#include <sys/mman.h>
+#ifdef PROTON_WASM
+# define PROT_READ  0x01
+# define PROT_WRITE 0x02
+# define MAP_FAILED ((void *)-1)
+# define munmap(addr, size) 0
+#else
+# include <sys/mman.h>
+#endif
 #ifdef HAVE_SYS_SYSCALL_H
 #include <sys/syscall.h>
 #endif
@@ -61,7 +72,9 @@
 # include <sys/event.h>
 #endif
 
+#ifndef PROTON_WASM
 # include "ntsync_tmp.h"
+#endif
 
 #include "ntstatus.h"
 #define WIN32_NO_STATUS

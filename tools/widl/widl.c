@@ -662,6 +662,9 @@ int open_typelib( const char *name )
             if (strendswith( name, ".dll" )) namelen -= 4;
             TRYOPEN( strmake( "%.*s/%.*s%s/%s", (int)strlen(dir) - 2, dir,
                               namelen, name, pe_dir, name ));
+            if (target.cpu == CPU_WASM32)
+                TRYOPEN( strmake( "%.*s/%.*s/unknown-windows/%s",
+                                  (int)strlen(dir) - 2, dir, namelen, name, name ));
         }
         else
         {

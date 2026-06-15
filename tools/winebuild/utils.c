@@ -843,6 +843,10 @@ void output_rva( const char *format, ... )
         vfprintf( output_file, format, valist );
         fputc( '\n', output_file );
     }
+    else if (target.cpu == CPU_WASM32)
+    {
+        output( "\t.long 0\n" );
+    }
     else
     {
         output( "\t.long " );
@@ -866,6 +870,10 @@ void output_thunk_rva( int ordinal, const char *format, ... )
             vfprintf( output_file, format, valist );
             fputc( '\n', output_file );
             if (get_ptr_size() == 8) output( "\t.long 0\n" );
+        }
+        else if (target.cpu == CPU_WASM32)
+        {
+            output( "\t%s 0\n", get_asm_ptr_keyword() );
         }
         else
         {

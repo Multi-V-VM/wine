@@ -2467,6 +2467,8 @@ static BOOL create_fake_dll( LPCSTR filename )
     nt->Signature = IMAGE_NT_SIGNATURE;
 #if defined __i386__
     nt->FileHeader.Machine = IMAGE_FILE_MACHINE_I386;
+#elif defined(__wasm32__) && defined(PROTON_WASM)
+    nt->FileHeader.Machine = IMAGE_FILE_MACHINE_I386;
 #elif defined __x86_64__
     nt->FileHeader.Machine = IMAGE_FILE_MACHINE_AMD64;
 #elif defined __arm__

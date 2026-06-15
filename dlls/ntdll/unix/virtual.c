@@ -24,6 +24,10 @@
 
 #include "config.h"
 
+#ifdef PROTON_WASM
+# define _WASI_EMULATED_SIGNAL
+#endif
+
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -35,7 +39,9 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
-#include <sys/mman.h>
+#ifndef PROTON_WASM
+# include <sys/mman.h>
+#endif
 #include <sys/ioctl.h>
 #ifdef HAVE_SYS_SYSINFO_H
 # include <sys/sysinfo.h>
@@ -66,6 +72,77 @@
 #endif
 #include <unistd.h>
 #include <dlfcn.h>
+
+#ifdef PROTON_WASM
+# define PROT_NONE  0x00
+# define PROT_READ  0x01
+# define PROT_WRITE 0x02
+# define PROT_EXEC  0x04
+# define MAP_SHARED   0x0001
+# define MAP_PRIVATE  0x0002
+# define MAP_FIXED    0x0010
+# define MAP_ANON     0x0020
+# define MAP_ANONYMOUS MAP_ANON
+# define MAP_FAILED ((void *)-1)
+# define MADV_DONTNEED 0
+# define MADV_WILLNEED 0
+# define MADV_NOHUGEPAGE 0
+# define MS_ASYNC 0
+
+static void *proton_wasm_mmap( void *addr, size_t size, int prot, int flags, int fd, off_t offset )
+{
+    void *ptr;
+
+    if (flags & MAP_FIXED) return addr ? addr : MAP_FAILED;
+    ptr = malloc( size ? size : 1 );
+    return ptr ? ptr : MAP_FAILED;
+}
+
+static int proton_wasm_munmap( void *addr, size_t size )
+{
+    return 0;
+}
+
+static int proton_wasm_mprotect( void *addr, size_t size, int prot )
+{
+    return 0;
+}
+
+static int proton_wasm_madvise( void *addr, size_t size, int advice )
+{
+    return 0;
+}
+
+static int proton_wasm_msync( void *addr, size_t size, int flags )
+{
+    return 0;
+}
+
+static ssize_t proton_wasm_recvmsg( int fd, struct msghdr *hdr, int flags )
+{
+    errno = ENOSYS;
+    return -1;
+}
+
+static int proton_wasm_mlock( const void *addr, size_t size )
+{
+    return 0;
+}
+
+static int proton_wasm_munlock( const void *addr, size_t size )
+{
+    return 0;
+}
+
+# define mmap   proton_wasm_mmap
+# define munmap proton_wasm_munmap
+# define mprotect proton_wasm_mprotect
+# define madvise proton_wasm_madvise
+# define msync proton_wasm_msync
+# define recvmsg proton_wasm_recvmsg
+# define mlock proton_wasm_mlock
+# define munlock proton_wasm_munlock
+#endif
 #ifdef HAVE_VALGRIND_VALGRIND_H
 # include <valgrind/valgrind.h>
 #endif

@@ -31,7 +31,7 @@
 #include "windef.h"
 #include "winternl.h"
 
-#include "unixlib.h"
+typedef NTSTATUS (*unixlib_entry_t)( void *args );
 
 static NTSTATUS init( void *args )
 {

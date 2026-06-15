@@ -417,6 +417,8 @@ void output_exports( DLLSPEC *spec )
 
     if (!nr_exports) return;
 
+    if (target.cpu == CPU_WASM32) return;
+
     /* ARM64EC exports are more tricky than other targets. For functions implemented in ARM64EC,
      * linker generates x86_64 thunk and relevant metadata. Use .drectve section to pass export
      * directives to the linker. */
@@ -737,6 +739,13 @@ void output_module( DLLSPEC *spec )
     unsigned int page_size = 0x1000;
     const char *data_dirs[16] = { NULL };
 
+    if (target.cpu == CPU_WASM32)
+    {
+        output( "\n\t.text\n" );
+        output( ".L__wine_spec_rva_base:\n" );
+        return;
+    }
+
     /* Reserve some space for the PE header */
 
     switch (target.platform)
@@ -760,6 +769,7 @@ void output_module( DLLSPEC *spec )
         output( "\t.balign %u\n", page_size );
         output( "__wine_spec_pe_header:\n" );
         output( "\t.skip %u\n", 65536 + page_size );
+        output( "\t.size __wine_spec_pe_header, %u\n", 65536 + page_size );
         break;
     default:
         output( "\n\t.section \".init\",\"ax\"\n" );
@@ -839,7 +849,7 @@ void output_module( DLLSPEC *spec )
     output( "\t.long 0\n" );              /* LoaderFlags */
     output( "\t.long 16\n" );             /* NumberOfRvaAndSizes */
 
-    if (get_exports_count( &spec->exports ))
+    if (target.cpu != CPU_WASM32 && get_exports_count( &spec->exports ))
         data_dirs[0] = ".L__wine_spec_exports";   /* DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT] */
     if (has_imports())
         data_dirs[1] = ".L__wine_spec_imports";   /* DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT] */
@@ -849,6 +859,9 @@ void output_module( DLLSPEC *spec )
         data_dirs[13] = ".L__wine_spec_delay_imports"; /* DataDirectory[IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT] */
 
     output_data_directories( data_dirs );
+
+    if (target.platform == PLATFORM_WASI)
+        output( "\t.size %s, .-%s\n", asm_name("__wine_spec_nt_header"), asm_name("__wine_spec_nt_header") );
 
     if (target.platform == PLATFORM_APPLE)
         output( "\t.lcomm %s,4\n", asm_name("_end") );

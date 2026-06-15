@@ -24,6 +24,10 @@
 
 #include "config.h"
 
+#ifdef PROTON_WASM
+# define _WASI_EMULATED_SIGNAL
+#endif
+
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -36,7 +40,9 @@
 #include <signal.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <sys/mman.h>
+#ifndef PROTON_WASM
+# include <sys/mman.h>
+#endif
 #ifdef HAVE_SCHED_H
 #include <sched.h>
 #endif
@@ -76,6 +82,12 @@
 #include "wine/server.h"
 #include "wine/debug.h"
 #include "unix_private.h"
+
+#ifdef PROTON_WASM
+# define SIG_BLOCK   0
+# define SIG_SETMASK 1
+# define pthread_sigmask(how, set, oldset) 0
+#endif
 
 WINE_DEFAULT_DEBUG_CHANNEL(thread);
 WINE_DECLARE_DEBUG_CHANNEL(seh);
@@ -1110,7 +1122,11 @@ static DECLSPEC_NORETURN void pthread_exit_wrapper( int status )
     close( ntdll_get_thread_data()->wait_fd[1] );
     close( ntdll_get_thread_data()->reply_fd );
     close( ntdll_get_thread_data()->request_fd );
+#ifdef PROTON_WASM
+    _exit( get_unix_exit_code( status ) );
+#else
     pthread_exit( UIntToPtr(status) );
+#endif
 }
 
 
@@ -1917,11 +1933,13 @@ NTSTATUS get_thread_context( HANDLE handle, void *context, BOOL *self, USHORT ma
 /***********************************************************************
  *              ntdll_set_exception_jmp_buf
  */
+#ifndef PROTON_WASM
 void ntdll_set_exception_jmp_buf( jmp_buf jmp )
 {
     assert( !jmp || !ntdll_get_thread_data()->jmp_buf );
     ntdll_get_thread_data()->jmp_buf = jmp;
 }
+#endif
 
 
 BOOL get_thread_times(int unix_pid, int unix_tid, LARGE_INTEGER *kernel_time, LARGE_INTEGER *user_time)
@@ -2217,6 +2235,7 @@ NTSTATUS WINAPI NtQueryInformationThread( HANDLE handle, THREADINFOCLASS class,
                 ret = get_thread_times( unix_pid, unix_tid, &kusrt.KernelTime, &kusrt.UserTime );
             if (!ret && handle == GetCurrentThread())
             {
+#ifndef PROTON_WASM
                 /* fall back to process times */
                 struct tms time_buf;
                 long clocks_per_sec = sysconf(_SC_CLK_TCK);
@@ -2224,6 +2243,7 @@ NTSTATUS WINAPI NtQueryInformationThread( HANDLE handle, THREADINFOCLASS class,
                 times(&time_buf);
                 kusrt.KernelTime.QuadPart = (ULONGLONG)time_buf.tms_stime * 10000000 / clocks_per_sec;
                 kusrt.UserTime.QuadPart = (ULONGLONG)time_buf.tms_utime * 10000000 / clocks_per_sec;
+#endif
             }
             if (data) memcpy( data, &kusrt, min( length, sizeof(kusrt) ));
             if (ret_len) *ret_len = min( length, sizeof(kusrt) );

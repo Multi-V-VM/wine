@@ -72,7 +72,7 @@ extern __msvcrt_long _timezone;
 extern char *_tzname;
 #endif
 
-#if _MSVCR_VER < 120 && defined(_USE_32BIT_TIME_T)
+#if _MSVCR_VER < 120 && defined(_USE_32BIT_TIME_T) && !(defined(__wasm32__) && defined(PROTON_WASM))
 #define _ctime32     ctime
 #define _difftime32  difftime
 #define _gmtime32    gmtime
@@ -122,7 +122,7 @@ static inline struct tm* localtime(const time_t *t) { return _localtime64(t); }
 static inline errno_t localtime_s(struct tm *res, const time_t *t) { return _localtime64_s(res, t); }
 static inline time_t mktime(struct tm *tm) { return _mktime64(tm); }
 static inline time_t time(time_t *t) { return _time64(t); }
-#elif defined(_UCRT)
+#elif defined(_UCRT) || (defined(__wasm32__) && defined(PROTON_WASM))
 static inline char* ctime(const time_t *t) { return _ctime32(t); }
 static inline errno_t ctime_s(char *res, size_t len, const __time32_t *t) { return _ctime32_s(res, len, t); }
 static inline double difftime(time_t t1, time_t t2) { return _difftime32(t1, t2); }

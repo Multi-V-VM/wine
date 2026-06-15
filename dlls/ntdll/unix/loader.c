@@ -24,19 +24,34 @@
 
 #include "config.h"
 
+#ifdef PROTON_WASM
+# define _WASI_EMULATED_SIGNAL
+#endif
+
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <signal.h>
-#include <spawn.h>
+#ifndef PROTON_WASM
+# include <spawn.h>
+#endif
 #include <string.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/mman.h>
-#include <sys/wait.h>
+#ifndef PROTON_WASM
+# include <sys/mman.h>
+# include <sys/wait.h>
+#else
+# define PROT_READ  0x01
+# define PROT_WRITE 0x02
+# define PROT_EXEC  0x04
+# define mprotect(addr, size, prot) 0
+# define munmap(addr, size) 0
+# define signal(sig, handler) ((void)0)
+#endif
 #include <unistd.h>
 #include <malloc.h>
 #include <dlfcn.h>
@@ -208,6 +223,9 @@ static void fatal_error( const char *err, ... )
 
 static void set_max_limit( int limit )
 {
+#ifdef PROTON_WASM
+    return;
+#else
     struct rlimit rlimit;
 
     if (!getrlimit( limit, &rlimit ))
@@ -227,6 +245,7 @@ static void set_max_limit( int limit )
 #endif
         WARN("Failed to raise limit %d\n", limit);
     }
+#endif
 }
 
 /* canonicalize path and return its directory name */
@@ -314,12 +333,16 @@ static char *build_relative_path( const char *base, const char *from, const char
 /* build a path to a binary and exec it */
 static int build_path_and_exec( pid_t *pid, const char *dir, const char *name, char **argv )
 {
+#ifdef PROTON_WASM
+    return ENOSYS;
+#else
     int ret;
 
     argv[0] = build_path( dir, name );
     ret = posix_spawn( pid, argv[0], NULL, NULL, argv, environ );
     free( argv[0] );
     return ret;
+#endif
 }
 
 
@@ -454,6 +477,10 @@ static void set_home_dir(void)
 
     if (!home || !name)
     {
+#ifdef PROTON_WASM
+        if (!home) home = "/";
+        if (!name) name = "wine";
+#else
         struct passwd *pwd = getpwuid( getuid() );
         if (pwd)
         {
@@ -461,6 +488,7 @@ static void set_home_dir(void)
             if (!name) name = pwd->pw_name;
         }
         if (!name) name = "wine";
+#endif
     }
     if ((p = strrchr( name, '/' ))) name = p + 1;
     if ((p = strrchr( name, '\\' ))) name = p + 1;
@@ -491,6 +519,12 @@ static void set_config_dir(void)
 
 static void init_paths(void)
 {
+#ifdef PROTON_WASM
+    ntdll_dir = LIBDIR "/wine";
+    dll_dir = ntdll_dir;
+    data_dir = DATADIR "/wine";
+    wineloader = BINDIR "/wine";
+#else
     Dl_info info;
 
     if (!dladdr( init_paths, &info ) || !(ntdll_dir = realpath_dirname( info.dli_fname )))
@@ -508,6 +542,7 @@ static void init_paths(void)
         data_dir = build_relative_path( dll_dir, LIBDIR "/wine", DATADIR "/wine" );
         wineloader = build_path( ntdll_dir, "wine" );
     }
+#endif
 
     set_dll_path();
     set_system_dll_path();
@@ -547,6 +582,9 @@ char *get_alternate_wineloader( WORD machine )
 
 static void preloader_exec( char **argv, WORD machine )
 {
+#ifdef PROTON_WASM
+    return;
+#else
 #ifdef HAVE_WINE_PRELOADER
 #if !defined(__arm__) && !defined(__aarch64__)
     if (machine == IMAGE_FILE_MACHINE_AMD64)
@@ -568,11 +606,15 @@ static void preloader_exec( char **argv, WORD machine )
     free( argv[0] );
 #endif
     execv( argv[1], argv + 1 );
+#endif
 }
 
 /* exec the appropriate wine loader for the specified machine */
 static NTSTATUS loader_exec( char **argv, WORD machine )
 {
+#ifdef PROTON_WASM
+    return STATUS_NOT_IMPLEMENTED;
+#else
     static char noexec[] = "WINELOADERNOEXEC=1";
 
     putenv( noexec );
@@ -582,6 +624,7 @@ static NTSTATUS loader_exec( char **argv, WORD machine )
     argv[1] = strdup( wineloader );
     preloader_exec( argv, machine );
     return STATUS_INVALID_IMAGE_FORMAT;
+#endif
 }
 
 
@@ -592,6 +635,9 @@ static NTSTATUS loader_exec( char **argv, WORD machine )
  */
 NTSTATUS exec_wineloader( char **argv, int socketfd, const struct pe_image_info *pe_info )
 {
+#ifdef PROTON_WASM
+    return STATUS_NOT_IMPLEMENTED;
+#else
     WORD machine = pe_info->machine;
     ULONGLONG res_start = pe_info->base;
     ULONGLONG res_end = pe_info->base + pe_info->map_size;
@@ -647,6 +693,7 @@ NTSTATUS exec_wineloader( char **argv, int socketfd, const struct pe_image_info 
     putenv( socket_env );
 
     return loader_exec( argv, machine );
+#endif
 }
 
 
@@ -684,6 +731,9 @@ static int exec_wineserver( pid_t *pid, char **argv )
  */
 void start_server( BOOL debug )
 {
+#ifdef PROTON_WASM
+    fatal_error( "wineserver exec is not available in the WASI build\n" );
+#else
     static BOOL started;  /* we only try once */
     char *argv[3];
     static char debug_flag[] = "-d";
@@ -702,6 +752,7 @@ void start_server( BOOL debug )
         if (status) exit(status);  /* server failed */
         started = TRUE;
     }
+#endif
 }
 
 
@@ -1377,6 +1428,10 @@ static NTSTATUS steamclient_setup_trampolines( void *args )
 
 BOOL debugstr_pc_impl( void *pc, char *buffer, unsigned int size )
 {
+#ifdef PROTON_WASM
+    snprintf( buffer, size, "%p:", pc );
+    return TRUE;
+#else
     unsigned int len;
     char *s = buffer;
     Dl_info info;
@@ -1394,6 +1449,7 @@ BOOL debugstr_pc_impl( void *pc, char *buffer, unsigned int size )
         snprintf( s, size, " (%s + %#zx)", info.dli_sname, (char *)pc - (char *)info.dli_saddr );
     }
     return TRUE;
+#endif
 }
 
 static NTSTATUS debugstr_pc( void *args )
@@ -2450,7 +2506,9 @@ static void start_main_thread(void)
     set_thread_teb( teb );
 #endif
 
+#ifndef PROTON_WASM
     mallopt( M_PERTURB, 0xff );
+#endif
     init_startup_info();
     *(ULONG_PTR *)&peb->CloudFileFlags = get_image_address();
     set_load_order_app_name( main_wargv[0] );
@@ -2459,7 +2517,9 @@ static void start_main_thread(void)
     load_ntdll();
     load_wow64_ntdll( main_image_info.Machine );
     load_apiset_dll();
+#ifndef PROTON_WASM
     mallopt( M_PERTURB, 0 );
+#endif
     server_init_process_done();
 }
 

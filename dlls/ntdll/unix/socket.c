@@ -23,6 +23,57 @@
 #endif
 
 #include "config.h"
+
+#ifdef PROTON_WASM
+
+#include <stdarg.h>
+
+#include "ntstatus.h"
+#define WIN32_NO_STATUS
+#include "windef.h"
+#include "winternl.h"
+#include "wine/debug.h"
+
+WINE_DEFAULT_DEBUG_CHANNEL(winsock);
+
+NTSTATUS sock_ioctl( HANDLE handle, HANDLE event, PIO_APC_ROUTINE apc, void *apc_user, IO_STATUS_BLOCK *io,
+                     UINT code, void *in_buffer, UINT in_size, void *out_buffer, UINT out_size )
+{
+    FIXME( "WASI socket ioctl %#x is not implemented\n", code );
+    if (io)
+    {
+        io->Status = STATUS_NOT_IMPLEMENTED;
+        io->Information = 0;
+    }
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+NTSTATUS sock_read( HANDLE handle, int fd, HANDLE event, PIO_APC_ROUTINE apc, void *apc_user,
+                    IO_STATUS_BLOCK *io, void *buffer, ULONG length )
+{
+    FIXME( "WASI socket read is not implemented\n" );
+    if (io)
+    {
+        io->Status = STATUS_NOT_IMPLEMENTED;
+        io->Information = 0;
+    }
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+NTSTATUS sock_write( HANDLE handle, int fd, HANDLE event, PIO_APC_ROUTINE apc, void *apc_user,
+                     IO_STATUS_BLOCK *io, const void *buffer, ULONG length )
+{
+    FIXME( "WASI socket write is not implemented\n" );
+    if (io)
+    {
+        io->Status = STATUS_NOT_IMPLEMENTED;
+        io->Information = 0;
+    }
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+#else /* PROTON_WASM */
+
 #include <assert.h>
 #include <errno.h>
 #include <sys/types.h>
@@ -2699,3 +2750,5 @@ NTSTATUS sock_ioctl( HANDLE handle, HANDLE event, PIO_APC_ROUTINE apc, void *apc
 
     return status;
 }
+
+#endif /* PROTON_WASM */

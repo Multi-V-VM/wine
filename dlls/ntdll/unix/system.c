@@ -763,10 +763,51 @@ void init_shared_data_cpuinfo( KUSER_SHARED_DATA *data )
     init_xstate_features( &data->XState );
 }
 
+#elif defined(__wasm32__) && defined(PROTON_WASM)
+
+unsigned int xstate_get_size( UINT64 compaction_mask, UINT64 mask )
+{
+    return 0;
+}
+
+void copy_xstate( XSAVE_AREA_HEADER *dst, XSAVE_AREA_HEADER *src, UINT64 mask )
+{
+}
+
+static void init_cpu_model(void)
+{
+    strcpy( cpu_vendor, "Wasm" );
+    strcpy( cpu_name, "Wasm32" );
+    cpu_level = 1;
+    cpu_revision = 0;
+    cpu_id = 0;
+}
+
+static ULONGLONG get_cpu_features(void)
+{
+    return 0;
+}
+
+void init_shared_data_cpuinfo( KUSER_SHARED_DATA *data )
+{
+    data->ProcessorFeatures[PF_FASTFAIL_AVAILABLE] = TRUE;
+}
+
 #endif /* End architecture specific feature detection for CPUs */
 
 static void fill_performance_core_info(void);
 static BOOL sysfs_parse_bitmap(const char *filename, ULONG_PTR *mask);
+
+#ifndef linux
+static void fill_performance_core_info(void)
+{
+}
+
+static BOOL sysfs_parse_bitmap(const char *filename, ULONG_PTR *mask)
+{
+    return FALSE;
+}
+#endif
 
 void fill_cpu_override(void)
 {
@@ -1922,6 +1963,8 @@ static SYSTEM_CPU_INFORMATION get_cpuinfo(void)
         .ProcessorArchitecture = PROCESSOR_ARCHITECTURE_INTEL,
 #elif defined(__x86_64__)
         .ProcessorArchitecture = PROCESSOR_ARCHITECTURE_AMD64,
+#elif defined(__wasm32__) && defined(PROTON_WASM)
+        .ProcessorArchitecture = PROCESSOR_ARCHITECTURE_INTEL,
 #endif
     };
 
