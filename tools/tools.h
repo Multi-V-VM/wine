@@ -99,7 +99,7 @@ extern char **environ;
 
 struct target
 {
-    enum { CPU_i386, CPU_x86_64, CPU_ARM, CPU_ARM64, CPU_ARM64EC } cpu;
+    enum { CPU_i386, CPU_x86_64, CPU_ARM, CPU_ARM64, CPU_ARM64EC, CPU_WASM32 } cpu;
 
     enum
     {
@@ -107,6 +107,7 @@ struct target
         PLATFORM_APPLE,
         PLATFORM_ANDROID,
         PLATFORM_LINUX,
+        PLATFORM_WASI,
         PLATFORM_FREEBSD,
         PLATFORM_SOLARIS,
         PLATFORM_WINDOWS,
@@ -556,6 +557,8 @@ static inline struct target get_default_target(void)
     target.cpu = CPU_ARM;
 #elif defined(__aarch64__)
     target.cpu = CPU_ARM64;
+#elif defined(__wasm32__)
+    target.cpu = CPU_WASM32;
 #else
 #error Unsupported CPU
 #endif
@@ -566,6 +569,8 @@ static inline struct target get_default_target(void)
     target.platform = PLATFORM_ANDROID;
 #elif defined(__linux__)
     target.platform = PLATFORM_LINUX;
+#elif defined(__wasi__)
+    target.platform = PLATFORM_WASI;
 #elif defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
     target.platform = PLATFORM_FREEBSD;
 #elif defined(__sun)
@@ -591,6 +596,7 @@ static inline unsigned int get_target_ptr_size( struct target target )
         [CPU_ARM]       = 4,
         [CPU_ARM64]     = 8,
         [CPU_ARM64EC]   = 8,
+        [CPU_WASM32]    = 4,
     };
     return sizes[target.cpu];
 }
@@ -612,6 +618,8 @@ static inline void set_target_ptr_size( struct target *target, unsigned int size
     case CPU_ARM64:
     case CPU_ARM64EC:
         if (size == 4) target->cpu = CPU_ARM;
+        break;
+    case CPU_WASM32:
         break;
     }
 }
@@ -644,6 +652,7 @@ static inline int get_cpu_from_name( const char *name )
         { "arm64ec",   CPU_ARM64EC },
         { "arm64",     CPU_ARM64 },
         { "arm",       CPU_ARM },
+        { "wasm32",    CPU_WASM32 },
     };
     unsigned int i;
 
@@ -665,6 +674,8 @@ static inline int get_platform_from_name( const char *name )
         { "darwin",      PLATFORM_APPLE },
         { "android",     PLATFORM_ANDROID },
         { "linux",       PLATFORM_LINUX },
+        { "wasi",        PLATFORM_WASI },
+        { "wasip1",      PLATFORM_WASI },
         { "freebsd",     PLATFORM_FREEBSD },
         { "solaris",     PLATFORM_SOLARIS },
         { "mingw32",     PLATFORM_MINGW },
@@ -691,6 +702,7 @@ static inline const char *get_arch_dir( struct target target )
         [CPU_ARM]     = "arm",
         [CPU_ARM64]   = "aarch64",
         [CPU_ARM64EC] = "aarch64",
+        [CPU_WASM32]  = "wasm32",
     };
 
     if (!cpu_names[target.cpu]) return "";
