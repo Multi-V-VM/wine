@@ -30,8 +30,12 @@
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <errno.h>
+#if defined(__wasm32__) && defined(PROTON_WASM)
+#define SONAME_LIBCUPS_DISABLED
+#else
 #include <signal.h>
 #include <sys/wait.h>
+#endif
 #ifdef HAVE_CUPS_CUPS_H
 #include <cups/cups.h>
 #endif
@@ -47,7 +51,7 @@ WINE_DEFAULT_DEBUG_CHANNEL(localspl);
 /* cups.h before version 1.7.0 doesn't have HTTP_STATUS_CONTINUE */
 #define HTTP_STATUS_CONTINUE 100
 
-#ifdef SONAME_LIBCUPS
+#if defined(SONAME_LIBCUPS) && !defined(SONAME_LIBCUPS_DISABLED)
 
 static void *libcups_handle;
 
@@ -71,7 +75,7 @@ CUPS_FUNCS;
 static cups_dest_t * (*pcupsGetNamedDest)(http_t *, const char *, const char *);
 static const char *  (*pcupsLastErrorString)(void);
 
-#endif /* SONAME_LIBCUPS */
+#endif /* SONAME_LIBCUPS && !SONAME_LIBCUPS_DISABLED */
 
 typedef struct _doc_t
 {
@@ -89,7 +93,7 @@ typedef struct _doc_t
         {
             int fd;
         } unixname;
-#ifdef SONAME_LIBCUPS
+#if defined(SONAME_LIBCUPS) && !defined(SONAME_LIBCUPS_DISABLED)
         struct
         {
             char *queue;
@@ -118,6 +122,10 @@ static BOOL pipe_write_doc(doc_t *doc, const BYTE *buf, unsigned int size)
 
 static BOOL pipe_end_doc(doc_t *doc)
 {
+#if defined(__wasm32__) && defined(PROTON_WASM)
+    FIXME("pipe printing is not supported on WASI\n");
+    return FALSE;
+#else
     pid_t wret;
     int status;
 
@@ -138,10 +146,15 @@ static BOOL pipe_end_doc(doc_t *doc)
     }
 
     return TRUE;
+#endif
 }
 
 static BOOL pipe_start_doc(doc_t *doc, const WCHAR *cmd)
 {
+#if defined(__wasm32__) && defined(PROTON_WASM)
+    FIXME("pipe printing is not supported on WASI\n");
+    return FALSE;
+#else
     char *cmdA;
     int fds[2];
     DWORD len;
@@ -185,6 +198,7 @@ static BOOL pipe_start_doc(doc_t *doc, const WCHAR *cmd)
 
     doc->pipe.fd = fds[1];
     return TRUE;
+#endif
 }
 
 static BOOL unixname_write_doc(doc_t *doc, const BYTE *buf, unsigned int size)
@@ -233,7 +247,7 @@ static BOOL lpr_start_doc(doc_t *doc, const WCHAR *printer_name)
     return ret;
 }
 
-#ifdef SONAME_LIBCUPS
+#if defined(SONAME_LIBCUPS) && !defined(SONAME_LIBCUPS_DISABLED)
 static int get_cups_default_options(const char *printer, int num_options, cups_option_t **options)
 {
     cups_dest_t *dest;
@@ -416,7 +430,7 @@ static BOOL cups_end_doc(doc_t *doc)
 
 static BOOL cups_start_doc(doc_t *doc, const WCHAR *printer_name, const WCHAR *document_title)
 {
-#ifdef SONAME_LIBCUPS
+#if defined(SONAME_LIBCUPS) && !defined(SONAME_LIBCUPS_DISABLED)
     if (pcupsWriteRequestData)
     {
         int len;
@@ -441,7 +455,7 @@ static BOOL cups_start_doc(doc_t *doc, const WCHAR *printer_name, const WCHAR *d
 
 static NTSTATUS process_attach(void *args)
 {
-#ifdef SONAME_LIBCUPS
+#if defined(SONAME_LIBCUPS) && !defined(SONAME_LIBCUPS_DISABLED)
     libcups_handle = dlopen(SONAME_LIBCUPS, RTLD_NOW);
     TRACE("%p: %s loaded\n", libcups_handle, SONAME_LIBCUPS);
     if (!libcups_handle) return STATUS_DLL_NOT_FOUND;

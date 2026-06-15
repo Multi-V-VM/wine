@@ -21,12 +21,20 @@
 
 #include "config.h"
 
+#if defined(__wasm32__) && defined(PROTON_WASM)
+#define WINE_SERVER_WASM 1
+#else
+#define WINE_SERVER_WASM 0
+#endif
+
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdarg.h>
+#if !WINE_SERVER_WASM
 #include <sys/mman.h>
+#endif
 #include <stdint.h>
 #ifdef HAVE_SYS_STAT_H
 # include <sys/stat.h>
@@ -47,6 +55,56 @@
 
 #include "pshpack4.h"
 #include "poppack.h"
+
+#if WINE_SERVER_WASM
+
+int do_fsync_cached = 0;
+
+int fsync_check_support(void)
+{
+    return 0;
+}
+
+void fsync_init(void)
+{
+}
+
+unsigned int fsync_alloc_shm( int low, int high )
+{
+    return 0;
+}
+
+void fsync_free_shm_idx( int shm_idx )
+{
+}
+
+int fsync_grab_shm_idx( unsigned int shm_idx )
+{
+    return 0;
+}
+
+void fsync_set_event( unsigned int shm_idx )
+{
+}
+
+void fsync_reset_event( unsigned int shm_idx )
+{
+}
+
+void fsync_abandon_mutex( unsigned int shm_idx, thread_id_t tid )
+{
+}
+
+void fsync_cleanup_process_shm_indices( process_id_t id )
+{
+}
+
+DECL_HANDLER(fsync_free_shm_idx)
+{
+    set_error( STATUS_NOT_IMPLEMENTED );
+}
+
+#else
 
 #ifndef __NR_futex_waitv
 #define __NR_futex_waitv 449
@@ -366,3 +424,5 @@ DECL_HANDLER(fsync_free_shm_idx)
     }
     fsync_free_shm_idx( req->shm_idx );
 }
+
+#endif

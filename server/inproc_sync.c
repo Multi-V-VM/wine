@@ -36,7 +36,9 @@
 
 #include "fsync.h"
 
+#if !(defined(__wasm32__) && defined(PROTON_WASM))
 #include "ntsync_tmp.h"
+#endif
 
 #ifdef NTSYNC_IOC_EVENT_READ
 

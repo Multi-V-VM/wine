@@ -22,6 +22,12 @@
 
 #include "config.h"
 
+#if defined(__wasm32__) && defined(PROTON_WASM)
+#define WINE_SERVER_WASM 1
+#else
+#define WINE_SERVER_WASM 0
+#endif
+
 #include <assert.h>
 #include <errno.h>
 #include <stdio.h>
@@ -45,6 +51,15 @@
 #include "security.h"
 
 #define MAX_SUBAUTH_COUNT 1
+
+static uid_t server_getuid(void)
+{
+#if WINE_SERVER_WASM
+    return 0;
+#else
+    return getuid();
+#endif
+}
 
 const struct luid SeIncreaseQuotaPrivilege        = {  5, 0 };
 const struct luid SeTcbPrivilege                  = {  7, 0 };
@@ -207,7 +222,7 @@ void security_set_thread_token( struct thread *thread, obj_handle_t handle )
 const struct sid *security_unix_uid_to_sid( uid_t uid )
 {
     /* very simple mapping: either the current user or not the current user */
-    if (uid == getuid())
+    if (uid == server_getuid())
         return &local_user_sid;
     else
         return &anonymous_logon_sid;
@@ -239,7 +254,7 @@ void init_user_sid(void)
     id = strtoull( machine_id, NULL, 0x10 );
     local_user_sid.sub_auth[1] = id >> 32;
     local_user_sid.sub_auth[2] = id & 0xffffffff;
-    local_user_sid.sub_auth[3] = getuid();
+    local_user_sid.sub_auth[3] = server_getuid();
 }
 
 static int acl_is_valid( const struct acl *acl, data_size_t size )
@@ -781,7 +796,7 @@ struct token *token_create_admin( unsigned primary, int impersonation_level, int
     struct sid alias_users_sid = { SID_REVISION, 2, SECURITY_NT_AUTHORITY, { SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_USERS }};
     /* on Windows, this value changes every time the user logs on */
     struct sid logon_sid = { SID_REVISION, 3, SECURITY_NT_AUTHORITY, { SECURITY_LOGON_IDS_RID, 0, 0 /* FIXME: should be randomly generated when tokens are inherited by new processes */ }};
-    const struct sid *user_sid = security_unix_uid_to_sid( getuid() );
+    const struct sid *user_sid = security_unix_uid_to_sid( server_getuid() );
     struct acl *default_dacl = create_default_dacl( &domain_users_sid );
     const struct luid_attr admin_privs[] =
     {

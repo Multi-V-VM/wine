@@ -22,6 +22,12 @@
 
 #include "config.h"
 
+#if defined(__wasm32__) && defined(PROTON_WASM)
+#define WINE_SERVER_WASM 1
+#else
+#define WINE_SERVER_WASM 0
+#endif
+
 #include <assert.h>
 #include <fcntl.h>
 #include <stdarg.h>
@@ -30,9 +36,13 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#if !WINE_SERVER_WASM
 #include <sys/ioctl.h>
+#endif
 #include <time.h>
+#if !WINE_SERVER_WASM
 #include <termios.h>
+#endif
 #include <unistd.h>
 #include <poll.h>
 #ifdef HAVE_UTIME_H
@@ -50,6 +60,31 @@
 #include "handle.h"
 #include "thread.h"
 #include "request.h"
+
+#if WINE_SERVER_WASM
+
+int is_serial_fd( struct fd *fd )
+{
+    return 0;
+}
+
+struct object *create_serial( struct fd *fd )
+{
+    set_error( STATUS_NOT_SUPPORTED );
+    return NULL;
+}
+
+DECL_HANDLER(get_serial_info)
+{
+    set_error( STATUS_NOT_SUPPORTED );
+}
+
+DECL_HANDLER(set_serial_info)
+{
+    set_error( STATUS_NOT_SUPPORTED );
+}
+
+#else
 
 struct wait_req
 {
@@ -355,3 +390,5 @@ DECL_HANDLER(set_serial_info)
         release_object( serial );
     }
 }
+
+#endif

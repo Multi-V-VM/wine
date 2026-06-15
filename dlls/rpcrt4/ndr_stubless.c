@@ -47,6 +47,16 @@ WINE_DEFAULT_DEBUG_CHANNEL(rpc);
 
 #define NDR_TABLE_MASK 127
 
+#if defined(__wasm32__) && defined(PROTON_WASM)
+static CLIENT_CALL_RETURN unsupported_client_call_return( const char *name )
+{
+    CLIENT_CALL_RETURN ret = {0};
+
+    FIXME("%s is not supported on wasm.\n", name);
+    return ret;
+}
+#endif
+
 static inline BOOL is_oicf_stubdesc(const PMIDL_STUB_DESC pStubDesc)
 {
     return pStubDesc->Version >= 0x20000;
@@ -1055,6 +1065,11 @@ __ASM_GLOBAL_FUNC( NdrClientCall2,
                    __ASM_CFI(".cfi_def_cfa %esp,4\n\t")
                    __ASM_CFI(".cfi_same_value %ebp\n\t")
                    "ret" )
+#elif defined(__wasm32__) && defined(PROTON_WASM)
+CLIENT_CALL_RETURN RPC_VAR_ENTRY NdrClientCall2( PMIDL_STUB_DESC desc, PFORMAT_STRING fmt, ... )
+{
+    return unsupported_client_call_return( "NdrClientCall2" );
+}
 #endif
 
 #if defined(__aarch64__) || defined(__arm__)
@@ -1119,7 +1134,7 @@ LONG_PTR WINAPI ndr_stubless_client_call( unsigned int index, void **args, void 
 #ifdef __x86_64__
                 unsigned short fpu_mask = *(unsigned short *)(ext + 1);
                 for (int i = 0; i < 4; i++, fpu_mask >>= 2) if (fpu_mask & 3) args[i] = fpu_regs[i];
-#else
+#elif defined(__aarch64__) || defined(__arm__)
                 stack_top = args_regs_to_stack( args, fpu_regs, hdr );
 #endif
             }
@@ -1889,6 +1904,11 @@ __ASM_GLOBAL_FUNC( NdrAsyncClientCall,
                    __ASM_CFI(".cfi_def_cfa %esp,4\n\t")
                    __ASM_CFI(".cfi_same_value %ebp\n\t")
                    "ret" )
+#elif defined(__wasm32__) && defined(PROTON_WASM)
+CLIENT_CALL_RETURN RPC_VAR_ENTRY NdrAsyncClientCall( PMIDL_STUB_DESC desc, PFORMAT_STRING fmt, ... )
+{
+    return unsupported_client_call_return( "NdrAsyncClientCall" );
+}
 #endif
 
 RPCRTAPI LONG RPC_ENTRY NdrAsyncStubCall(struct IRpcStubBuffer* pThis,
@@ -2235,6 +2255,11 @@ __ASM_GLOBAL_FUNC( NdrClientCall3,
                    "addq $0x28,%rsp\n\t"
                    __ASM_CFI(".cfi_adjust_cfa_offset -0x28\n\t")
                    "ret" )
+#elif defined(__wasm32__) && defined(PROTON_WASM)
+CLIENT_CALL_RETURN RPC_VAR_ENTRY NdrClientCall3( MIDL_STUBLESS_PROXY_INFO *info, ULONG proc, void *retval, ... )
+{
+    return unsupported_client_call_return( "NdrClientCall3" );
+}
 #endif
 
 LONG_PTR CDECL ndr64_async_client_call( MIDL_STUBLESS_PROXY_INFO *info,
@@ -2307,4 +2332,9 @@ __ASM_GLOBAL_FUNC( Ndr64AsyncClientCall,
                    "addq $0x28,%rsp\n\t"
                    __ASM_CFI(".cfi_adjust_cfa_offset -0x28\n\t")
                    "ret" )
+#elif defined(__wasm32__) && defined(PROTON_WASM)
+CLIENT_CALL_RETURN RPC_VAR_ENTRY Ndr64AsyncClientCall( MIDL_STUBLESS_PROXY_INFO *info, ULONG proc, void *retval, ... )
+{
+    return unsupported_client_call_return( "Ndr64AsyncClientCall" );
+}
 #endif

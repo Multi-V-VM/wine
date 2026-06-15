@@ -27,9 +27,13 @@
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
+#if !(defined(__wasm32__) && defined(PROTON_WASM))
 #include <signal.h>
+#endif
 #include <sys/ioctl.h>
+#if !(defined(__wasm32__) && defined(PROTON_WASM))
 #include <termios.h>
+#endif
 
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
@@ -142,7 +146,9 @@ struct console_server
     unsigned int          busy : 1;       /* flag if server processing an ioctl */
     unsigned int          once_input : 1; /* flag if input thread has already been requested */
     int                   term_fd;        /* UNIX terminal fd */
+#if !(defined(__wasm32__) && defined(PROTON_WASM))
     struct termios        termios;        /* original termios */
+#endif
 };
 
 static void console_server_dump( struct object *obj, int verbose );
@@ -611,7 +617,9 @@ static void disconnect_console_server( struct console_server *server )
 
     if (server->term_fd != -1)
     {
+#if !(defined(__wasm32__) && defined(PROTON_WASM))
         tcsetattr( server->term_fd, TCSANOW, &server->termios );
+#endif
         close( server->term_fd );
         server->term_fd = -1;
     }
@@ -679,6 +687,12 @@ struct console_signal_info
     int                    signal;
 };
 
+#if defined(__wasm32__) && defined(PROTON_WASM)
+static void propagate_console_signal( struct console *console, int sig, process_id_t group_id )
+{
+    set_error( STATUS_NOT_SUPPORTED );
+}
+#else
 static int propagate_console_signal_cb(struct process *process, void *user)
 {
     struct console_signal_info* csi = (struct console_signal_info*)user;
@@ -719,6 +733,7 @@ static void propagate_console_signal( struct console *console,
 
     enum_processes(propagate_console_signal_cb, &csi);
 }
+#endif
 
 struct console_process_list
 {
@@ -1191,6 +1206,10 @@ static void console_server_ioctl( struct fd *fd, ioctl_code_t code, struct async
 
     case IOCTL_CONDRV_SETUP_INPUT:
         {
+#if defined(__wasm32__) && defined(PROTON_WASM)
+            set_error( STATUS_NOT_SUPPORTED );
+            return;
+#else
             struct termios term;
             obj_handle_t handle;
             struct file *file;
@@ -1231,6 +1250,7 @@ static void console_server_ioctl( struct fd *fd, ioctl_code_t code, struct async
             if (tcsetattr( unix_fd, TCSANOW, &term ) || (server->term_fd = dup( unix_fd )) == -1)
                 file_set_error();
             return;
+#endif
         }
 
     default:

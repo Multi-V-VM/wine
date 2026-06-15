@@ -24,7 +24,9 @@
 #include <assert.h>
 #include <errno.h>
 #include <stdio.h>
+#if !(defined(__wasm32__) && defined(PROTON_WASM))
 #include <signal.h>
+#endif
 #include <stdarg.h>
 #include <sys/types.h>
 #include <unistd.h>

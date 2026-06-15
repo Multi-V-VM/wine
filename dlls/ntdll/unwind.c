@@ -36,6 +36,120 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(unwind);
 
+#if defined(__wasm32__) && defined(PROTON_WASM)
+
+void register_module_exception_directory( void *module )
+{
+}
+
+void unregister_module_exception_directory( void *module )
+{
+}
+
+BOOLEAN CDECL RtlInstallFunctionTableCallback( ULONG_PTR table, ULONG_PTR base, DWORD length,
+                                               PGET_RUNTIME_FUNCTION_CALLBACK callback, PVOID context,
+                                               PCWSTR dll )
+{
+    FIXME( "%Ix %Ix %ld %p %p %s: unsupported on wasm.\n", table, base, length, callback, context,
+           wine_dbgstr_w(dll) );
+    return FALSE;
+}
+
+NTSTATUS WINAPI RtlAddGrowableFunctionTable( void **table, RUNTIME_FUNCTION *functions, DWORD count,
+                                             DWORD max_count, ULONG_PTR base, ULONG_PTR end )
+{
+    FIXME( "%p, %p, %lu, %lu, %Ix, %Ix: unsupported on wasm.\n",
+           table, functions, count, max_count, base, end );
+    if (table) *table = NULL;
+    return STATUS_NOT_SUPPORTED;
+}
+
+void WINAPI RtlGrowFunctionTable( void *table, DWORD count )
+{
+    FIXME( "%p, %lu: unsupported on wasm.\n", table, count );
+}
+
+void WINAPI RtlDeleteGrowableFunctionTable( void *table )
+{
+    FIXME( "%p: unsupported on wasm.\n", table );
+}
+
+BOOLEAN CDECL RtlDeleteFunctionTable( RUNTIME_FUNCTION *table )
+{
+    FIXME( "%p: unsupported on wasm.\n", table );
+    return FALSE;
+}
+
+PRUNTIME_FUNCTION WINAPI RtlLookupFunctionTable( ULONG_PTR pc, ULONG_PTR *base, ULONG *len )
+{
+    if (base) *base = 0;
+    if (len) *len = 0;
+    return NULL;
+}
+
+PRUNTIME_FUNCTION WINAPI RtlLookupFunctionEntry( ULONG_PTR pc, ULONG_PTR *base,
+                                                 UNWIND_HISTORY_TABLE *table )
+{
+    if (base) *base = 0;
+    return NULL;
+}
+
+BOOLEAN CDECL RtlAddFunctionTable( RUNTIME_FUNCTION *table, DWORD count, ULONG_PTR base )
+{
+    FIXME( "%p, %lu, %Ix: unsupported on wasm.\n", table, count, base );
+    return FALSE;
+}
+
+NTSTATUS WINAPI RtlVirtualUnwind2( ULONG type, ULONG_PTR base, ULONG_PTR pc,
+                                   RUNTIME_FUNCTION *function, CONTEXT *context,
+                                   BOOLEAN *mach_frame_unwound, void **data,
+                                   ULONG_PTR *frame_ret, KNONVOLATILE_CONTEXT_POINTERS *ctx_ptr,
+                                   ULONG_PTR *limit_low, ULONG_PTR *limit_high,
+                                   PEXCEPTION_ROUTINE *handler_ret, ULONG flags )
+{
+    FIXME( "%lx, %Ix, %Ix, %p, %p: unsupported on wasm.\n", type, base, pc, function, context );
+    if (mach_frame_unwound) *mach_frame_unwound = FALSE;
+    if (data) *data = NULL;
+    if (frame_ret) *frame_ret = 0;
+    if (limit_low) *limit_low = 0;
+    if (limit_high) *limit_high = 0;
+    if (handler_ret) *handler_ret = NULL;
+    return STATUS_NOT_SUPPORTED;
+}
+
+PEXCEPTION_ROUTINE WINAPI RtlVirtualUnwind( ULONG type, ULONG_PTR base, ULONG_PTR pc,
+                                            RUNTIME_FUNCTION *func, CONTEXT *context,
+                                            PVOID *handler_data, ULONG_PTR *frame_ret,
+                                            KNONVOLATILE_CONTEXT_POINTERS *ctx_ptr )
+{
+    if (handler_data) *handler_data = NULL;
+    if (frame_ret) *frame_ret = 0;
+    if (context) context->Eip = 0;
+    return NULL;
+}
+
+void WINAPI RtlUnwindEx( void *frame, void *target_ip, EXCEPTION_RECORD *rec,
+                         void *retval, CONTEXT *context, UNWIND_HISTORY_TABLE *table )
+{
+    FIXME( "%p, %p, %p, %p, %p, %p: unsupported on wasm.\n", frame, target_ip, rec, retval,
+           context, table );
+    RtlRaiseStatus( STATUS_NOT_SUPPORTED );
+}
+
+void WINAPI RtlUnwind( void *frame, void *target_ip, EXCEPTION_RECORD *rec, void *retval )
+{
+    RtlUnwindEx( frame, target_ip, rec, retval, NULL, NULL );
+}
+
+__ASM_GLOBAL_IMPORT(RtlUnwind)
+
+void WINAPI _local_unwind( void *frame, void *target_ip )
+{
+    RtlUnwind( frame, target_ip, NULL, NULL );
+}
+
+#else
+
 
 /***********************************************************************
  * C specific handler
@@ -2473,6 +2587,8 @@ void WINAPI _local_unwind( void *frame, void *target_ip )
 {
     RtlUnwind( frame, target_ip, NULL, NULL );
 }
+
+#endif  /* __wasm32__ && PROTON_WASM */
 
 #else
 

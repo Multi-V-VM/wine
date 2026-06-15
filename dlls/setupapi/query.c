@@ -33,7 +33,7 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(setupapi);
 
-#ifdef __i386__
+#if defined(__i386__) || (defined(__wasm32__) && defined(PROTON_WASM))
 static const WCHAR source_disks_names_platform[] = L"SourceDisksNames.x86";
 static const WCHAR source_disks_files_platform[] = L"SourceDisksFiles.x86";
 #elif defined(__x86_64__)

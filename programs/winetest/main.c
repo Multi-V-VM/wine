@@ -452,7 +452,7 @@ static void restore_crash_dialog( int prev )
 
 static void print_version (void)
 {
-#ifdef __i386__
+#if defined(__i386__) || (defined(__wasm32__) && defined(PROTON_WASM))
     static const char platform[] = "i386";
 #elif defined(__x86_64__)
     static const char platform[] = "x86_64";

@@ -52,7 +52,7 @@
 WINE_DEFAULT_DEBUG_CHANNEL(setupapi);
 
 /* Unicode constants */
-#ifdef __i386__
+#if defined(__i386__) || (defined(__wasm32__) && defined(PROTON_WASM))
 static const WCHAR NtPlatformExtension[] = L".NTx86";
 #elif defined(__x86_64__)
 static const WCHAR NtPlatformExtension[] = L".NTamd64";

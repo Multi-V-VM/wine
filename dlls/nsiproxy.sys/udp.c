@@ -23,6 +23,77 @@
 #endif
 
 #include "config.h"
+
+#if defined(__wasm32__) && defined(PROTON_WASM)
+
+#include <stdarg.h>
+
+#include "ntstatus.h"
+#define WIN32_NO_STATUS
+#include "windef.h"
+#include "winbase.h"
+#include "winternl.h"
+#define USE_WS_PREFIX
+#include "winsock2.h"
+#include "ws2ipdef.h"
+#include "ifdef.h"
+#include "netiodef.h"
+#include "udpmib.h"
+#include "wine/nsi.h"
+#include "wine/debug.h"
+#include "wine/server.h"
+
+#include "unix_private.h"
+
+WINE_DEFAULT_DEBUG_CHANNEL(nsi);
+
+static NTSTATUS empty_enumerate_all( void *key_data, UINT key_size, void *rw_data, UINT rw_size,
+                                     void *dynamic_data, UINT dynamic_size, void *static_data,
+                                     UINT static_size, UINT_PTR *count )
+{
+    *count = 0;
+    return STATUS_SUCCESS;
+}
+
+static NTSTATUS unsupported_get_all_parameters( const void *key, UINT key_size, void *rw_data, UINT rw_size,
+                                                void *dynamic_data, UINT dynamic_size, void *static_data,
+                                                UINT static_size )
+{
+    return STATUS_NOT_SUPPORTED;
+}
+
+static const struct module_table udp_tables[] =
+{
+    {
+        NSI_UDP_STATS_TABLE,
+        {
+            sizeof(USHORT), 0,
+            sizeof(struct nsi_udp_stats_dynamic), 0
+        },
+        NULL,
+        unsupported_get_all_parameters,
+    },
+    {
+        NSI_UDP_ENDPOINT_TABLE,
+        {
+            sizeof(struct nsi_udp_endpoint_key), 0,
+            0, sizeof(struct nsi_udp_endpoint_static)
+        },
+        empty_enumerate_all,
+    },
+    {
+        ~0u
+    }
+};
+
+const struct module udp_module =
+{
+    &NPI_MS_UDP_MODULEID,
+    udp_tables
+};
+
+#else
+
 #include <stdarg.h>
 #include <stddef.h>
 #include <sys/types.h>
@@ -315,3 +386,5 @@ const struct module udp_module =
     &NPI_MS_UDP_MODULEID,
     udp_tables
 };
+
+#endif

@@ -135,7 +135,7 @@ static const printenv_t env_win40 = { L"Windows 4.0", L"win40", 0, L"\\Version-0
 
 static const printenv_t * const all_printenv[] = { &env_x86, &env_x64, &env_arm, &env_arm64, &env_win40 };
 
-#ifdef __i386__
+#if defined(__i386__) || (defined(__wasm32__) && defined(PROTON_WASM))
 #define env_arch env_x86
 #elif defined __x86_64__
 #define env_arch env_x64

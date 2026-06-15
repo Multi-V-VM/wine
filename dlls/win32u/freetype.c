@@ -33,7 +33,9 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <dlfcn.h>
+#if !defined(__wasm32__) || !defined(PROTON_WASM)
 #include <sys/mman.h>
+#endif
 #include <string.h>
 #include <dirent.h>
 #include <stdio.h>
@@ -226,6 +228,49 @@ struct font_mapping
 };
 
 static struct list mappings_list = LIST_INIT( mappings_list );
+
+#if defined(__wasm32__) && defined(PROTON_WASM)
+#define MAP_FAILED ((void *)-1)
+
+static void *map_readonly_file( int fd, size_t size )
+{
+    char *data, *ptr;
+    size_t remaining = size;
+    ssize_t ret;
+
+    if (!size) return MAP_FAILED;
+    if (!(data = malloc( size ))) return MAP_FAILED;
+
+    ptr = data;
+    while (remaining)
+    {
+        ret = read( fd, ptr, remaining );
+        if (ret <= 0)
+        {
+            free( data );
+            return MAP_FAILED;
+        }
+        ptr += ret;
+        remaining -= ret;
+    }
+    return data;
+}
+
+static void unmap_readonly_file( void *data, size_t size )
+{
+    free( data );
+}
+#else
+static void *map_readonly_file( int fd, size_t size )
+{
+    return mmap( NULL, size, PROT_READ, MAP_PRIVATE, fd, 0 );
+}
+
+static void unmap_readonly_file( void *data, size_t size )
+{
+    munmap( data, size );
+}
+#endif
 
 static UINT default_aa_flags;
 static LCID system_lcid;
@@ -920,7 +965,7 @@ static struct unix_face *unix_face_create( const char *unix_name, void *data_ptr
             return NULL;
         }
         data_size = st.st_size;
-        data_ptr = mmap( NULL, data_size, PROT_READ, MAP_PRIVATE, fd, 0 );
+        data_ptr = map_readonly_file( fd, data_size );
         close( fd );
         if (data_ptr == MAP_FAILED) return NULL;
     }
@@ -1026,7 +1071,7 @@ static struct unix_face *unix_face_create( const char *unix_name, void *data_ptr
     }
 
 done:
-    if (unix_name) munmap( data_ptr, data_size );
+    if (unix_name) unmap_readonly_file( data_ptr, data_size );
     return This;
 }
 
@@ -1659,7 +1704,7 @@ static struct font_mapping *map_font_file( const char *name )
     if (!(mapping = malloc( sizeof(*mapping) )))
         goto error;
 
-    mapping->data = mmap( NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0 );
+    mapping->data = map_readonly_file( fd, st.st_size );
     close( fd );
 
     if (mapping->data == MAP_FAILED)
@@ -1684,7 +1729,7 @@ static void unmap_font_file( struct font_mapping *mapping )
     if (!--mapping->refcount)
     {
         list_remove( &mapping->entry );
-        munmap( mapping->data, mapping->size );
+        unmap_readonly_file( mapping->data, mapping->size );
         free( mapping );
     }
 }

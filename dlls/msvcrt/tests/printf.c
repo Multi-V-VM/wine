@@ -36,6 +36,11 @@
 
 #include "wine/test.h"
 
+#if defined(__wasm32__) && defined(PROTON_WASM)
+extern int __cdecl _swprintf(wchar_t *, const wchar_t *, ...);
+#define swprintf _swprintf
+#endif
+
 static inline float __port_ind(void)
 {
     static const unsigned __ind_bytes = 0xffc00000;

@@ -6439,7 +6439,9 @@ static void async_file_read_init(void)
     ERR("HACK: AC Odyssey async read workaround.\n");
 
     pthread_attr_init( &pthread_attr );
+#ifndef PROTON_WASM
     pthread_attr_setscope( &pthread_attr, PTHREAD_SCOPE_SYSTEM );
+#endif
     pthread_attr_setdetachstate( &pthread_attr, PTHREAD_CREATE_DETACHED );
 
     pthread_create( &async_file_read_thread_id, &pthread_attr, (void * (*)(void *))async_file_read_thread, NULL);

@@ -46,23 +46,39 @@
 
 #define VTABLE_ADD_FUNC(name) "\t.quad " THISCALL_NAME(name) "\n"
 
+#if defined(__wasm32__) && defined(PROTON_WASM)
+#define __ASM_VTABLE_SIZE(name) "\t.size " __ASM_NAME(#name "_vtable") ",.-" __ASM_NAME(#name "_vtable") "\n"
+#else
+#define __ASM_VTABLE_SIZE(name) ""
+#endif
+
 #define __ASM_VTABLE(name,funcs) \
     __asm__(".data\n" \
             "\t.balign 8\n" \
             "\t.quad " __ASM_NAME(#name "_rtti") "\n" \
             __ASM_GLOBL(__ASM_NAME(#name "_vtable")) "\n" \
-            funcs "\n\t.text")
+            funcs "\n" \
+            __ASM_VTABLE_SIZE(name) \
+            "\t.text")
 
 #else
 
 #define VTABLE_ADD_FUNC(name) "\t.long " THISCALL_NAME(name) "\n"
+
+#if defined(__wasm32__) && defined(PROTON_WASM)
+#define __ASM_VTABLE_SIZE(name) "\t.size " __ASM_NAME(#name "_vtable") ",.-" __ASM_NAME(#name "_vtable") "\n"
+#else
+#define __ASM_VTABLE_SIZE(name) ""
+#endif
 
 #define __ASM_VTABLE(name,funcs) \
     __asm__(".data\n" \
             "\t.balign 4\n" \
             "\t.long " __ASM_NAME(#name "_rtti") "\n" \
             __ASM_GLOBL(__ASM_NAME(#name "_vtable")) "\n" \
-            funcs "\n\t.text")
+            funcs "\n" \
+            __ASM_VTABLE_SIZE(name) \
+            "\t.text")
 
 #endif /* _WIN64 */
 

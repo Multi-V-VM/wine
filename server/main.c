@@ -20,10 +20,19 @@
 
 #include "config.h"
 
+#if defined(__wasm32__) && defined(PROTON_WASM)
+#define WINE_SERVER_WASM 1
+#else
+#define WINE_SERVER_WASM 0
+#endif
+
 #include <assert.h>
 #include <ctype.h>
 #include <fcntl.h>
+#if !WINE_SERVER_WASM
 #include <signal.h>
+#endif
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h>
@@ -49,6 +58,42 @@ int debug_level = 0;
 int foreground = 0;
 timeout_t master_socket_timeout = 0; /* master socket timeout, default is 3 seconds */
 const char *server_argv0;
+
+#if WINE_SERVER_WASM
+typedef int ti_int __attribute__((mode(TI)));
+
+ti_int __multi3( ti_int a, ti_int b )
+{
+    union int128_words
+    {
+        ti_int all;
+        struct
+        {
+            uint64_t low;
+            uint64_t high;
+        } s;
+    } x, y, r;
+    uint64_t low_low, low_high, high_low, high_high, carry;
+    uint64_t low, high;
+
+    x.all = a;
+    y.all = b;
+
+    low_low = (uint64_t)(uint32_t)x.s.low * (uint32_t)y.s.low;
+    low_high = (x.s.low >> 32) * (uint64_t)(uint32_t)y.s.low;
+    high_low = (uint64_t)(uint32_t)x.s.low * (y.s.low >> 32);
+    high_high = (x.s.low >> 32) * (y.s.low >> 32);
+
+    carry = (low_low >> 32) + (uint32_t)low_high + (uint32_t)high_low;
+    low = (low_low & 0xffffffff) | (carry << 32);
+    high = high_high + (low_high >> 32) + (high_low >> 32) + (carry >> 32);
+    high += x.s.low * y.s.high + x.s.high * y.s.low;
+
+    r.s.low = low;
+    r.s.high = high;
+    return r.all;
+}
+#endif
 
 /* parse-line args */
 
@@ -216,10 +261,12 @@ error:
     exit(1);
 }
 
+#if !WINE_SERVER_WASM
 static void sigterm_handler( int signum )
 {
     exit(1);  /* make sure atexit functions get called */
 }
+#endif
 
 static void init_limits(void)
 {
@@ -251,12 +298,14 @@ int main( int argc, char *argv[] )
     parse_options( argc, argv, "d::fhk::p::vw", long_options, option_callback );
 
     /* setup temporary handlers before the real signal initialization is done */
+#if !WINE_SERVER_WASM
     signal( SIGPIPE, SIG_IGN );
     signal( SIGHUP, sigterm_handler );
     signal( SIGINT, sigterm_handler );
     signal( SIGQUIT, sigterm_handler );
     signal( SIGTERM, sigterm_handler );
     signal( SIGABRT, sigterm_handler );
+#endif
     init_limits();
 
     sock_init();
@@ -265,7 +314,14 @@ int main( int argc, char *argv[] )
     if (do_fsync())
         fsync_init();
 
-    if (debug_level) fprintf( stderr, "wineserver: starting (pid=%ld)\n", (long) getpid() );
+    if (debug_level)
+    {
+#if WINE_SERVER_WASM
+        fprintf( stderr, "wineserver: starting (pid=wasm)\n" );
+#else
+        fprintf( stderr, "wineserver: starting (pid=%ld)\n", (long) getpid() );
+#endif
+    }
     set_current_time();
     init_signals();
     init_memory();

@@ -32,8 +32,12 @@
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <errno.h>
+#if defined(__wasm32__) && defined(PROTON_WASM)
+#define SONAME_LIBCUPS_DISABLED
+#else
 #include <signal.h>
 #include <sys/wait.h>
+#endif
 #ifdef HAVE_CUPS_CUPS_H
 #include <cups/cups.h>
 #endif
@@ -73,7 +77,7 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(winspool);
 
-#ifdef SONAME_LIBCUPS
+#if defined(SONAME_LIBCUPS) && !defined(SONAME_LIBCUPS_DISABLED)
 
 static void *libcups_handle;
 
@@ -91,11 +95,11 @@ CUPS_FUNCS;
 static const char *  (*pcupsGetPPD)(const char *);
 static http_status_t (*pcupsGetPPD3)(http_t *, const char *, time_t *, char *, size_t);
 
-#endif /* SONAME_LIBCUPS */
+#endif /* SONAME_LIBCUPS && !SONAME_LIBCUPS_DISABLED */
 
 static NTSTATUS process_attach( void *args )
 {
-#ifdef SONAME_LIBCUPS
+#if defined(SONAME_LIBCUPS) && !defined(SONAME_LIBCUPS_DISABLED)
     libcups_handle = dlopen( SONAME_LIBCUPS, RTLD_NOW );
     TRACE( "%p: %s loaded\n", libcups_handle, SONAME_LIBCUPS );
     if (!libcups_handle) return STATUS_DLL_NOT_FOUND;
@@ -114,13 +118,13 @@ static NTSTATUS process_attach( void *args )
     CUPS_OPT_FUNCS;
 #undef DO_FUNC
     return STATUS_SUCCESS;
-#else /* SONAME_LIBCUPS */
+#else /* SONAME_LIBCUPS && !SONAME_LIBCUPS_DISABLED */
     return STATUS_NOT_SUPPORTED;
-#endif /* SONAME_LIBCUPS */
+#endif /* SONAME_LIBCUPS && !SONAME_LIBCUPS_DISABLED */
 }
 
 
-#ifdef SONAME_LIBCUPS
+#if defined(SONAME_LIBCUPS) && !defined(SONAME_LIBCUPS_DISABLED)
 static WCHAR *cups_get_optionW( const char *opt_name, int num_options, cups_option_t *options )
 {
     const char *value;
@@ -203,12 +207,12 @@ static http_status_t cupsGetPPD3_wrapper( http_t *http, const char *name, time_t
     }
     return HTTP_OK;
 }
-#endif /* SONAME_LIBCUPS */
+#endif /* SONAME_LIBCUPS && !SONAME_LIBCUPS_DISABLED */
 
 static NTSTATUS enum_printers( void *args )
 {
     const struct enum_printers_params *params = args;
-#ifdef SONAME_LIBCUPS
+#if defined(SONAME_LIBCUPS) && !defined(SONAME_LIBCUPS_DISABLED)
     unsigned int num, i, name_len, comment_len, location_len, needed;
     WCHAR *comment, *location, *ptr;
     struct printer_info *info;
@@ -272,7 +276,7 @@ static NTSTATUS enum_printers( void *args )
 #else
     *params->num = 0;
     return STATUS_NOT_SUPPORTED;
-#endif /* SONAME_LIBCUPS */
+#endif /* SONAME_LIBCUPS && !SONAME_LIBCUPS_DISABLED */
 }
 
 static NTSTATUS get_ppd( void *args )
@@ -292,7 +296,7 @@ static NTSTATUS get_ppd( void *args )
     }
     else
     {
-#ifdef SONAME_LIBCUPS
+#if defined(SONAME_LIBCUPS) && !defined(SONAME_LIBCUPS_DISABLED)
         http_status_t http_status;
         time_t modtime = 0;
         char *printer_name;

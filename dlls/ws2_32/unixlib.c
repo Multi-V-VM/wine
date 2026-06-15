@@ -105,6 +105,58 @@
 WINE_DEFAULT_DEBUG_CHANNEL(winsock);
 WINE_DECLARE_DEBUG_CHANNEL(winediag);
 
+#if defined(__wasm32__) && defined(PROTON_WASM)
+
+static NTSTATUS unix_getaddrinfo( void *args )
+{
+    struct getaddrinfo_params *params = args;
+
+    if (params->size) *params->size = 0;
+    FIXME( "getaddrinfo is not supported on WASI\n" );
+    return WS_EAI_FAIL;
+}
+
+static NTSTATUS unix_gethostbyaddr( void *args )
+{
+    FIXME( "gethostbyaddr is not supported on WASI\n" );
+    return WSAHOST_NOT_FOUND;
+}
+
+static NTSTATUS unix_gethostbyname( void *args )
+{
+    FIXME( "gethostbyname is not supported on WASI\n" );
+    return WSAHOST_NOT_FOUND;
+}
+
+static NTSTATUS unix_gethostname( void *args )
+{
+    static const char name[] = "localhost";
+    struct gethostname_params *params = args;
+
+    if (params->size < sizeof(name)) return WSAEFAULT;
+    memcpy( params->name, name, sizeof(name) );
+    return 0;
+}
+
+static NTSTATUS unix_getnameinfo( void *args )
+{
+    FIXME( "getnameinfo is not supported on WASI\n" );
+    return WS_EAI_FAIL;
+}
+
+const unixlib_entry_t __wine_unix_call_funcs[] =
+{
+    unix_getaddrinfo,
+    unix_gethostbyaddr,
+    unix_gethostbyname,
+    unix_gethostname,
+    unix_getnameinfo,
+};
+
+C_ASSERT( ARRAYSIZE(__wine_unix_call_funcs) == ws_unix_funcs_count );
+
+#else
+
 #ifndef HAVE_LINUX_GETHOSTBYNAME_R_6
 static pthread_mutex_t host_mutex = PTHREAD_MUTEX_INITIALIZER;
 #endif
@@ -1356,3 +1408,5 @@ const unixlib_entry_t __wine_unix_call_wow64_funcs[] =
 C_ASSERT( ARRAYSIZE(__wine_unix_call_wow64_funcs) == ws_unix_funcs_count );
 
 #endif  /* _WIN64 */
+
+#endif  /* __wasm32__ && PROTON_WASM */

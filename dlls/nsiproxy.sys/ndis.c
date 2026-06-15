@@ -24,6 +24,95 @@
 
 #include "config.h"
 
+#if defined(__wasm32__) && defined(PROTON_WASM)
+
+#include <stdarg.h>
+
+#include "ntstatus.h"
+#define WIN32_NO_STATUS
+#include "windef.h"
+#include "winbase.h"
+#include "winternl.h"
+#include "winioctl.h"
+#define USE_WS_PREFIX
+#include "winsock2.h"
+#include "ws2ipdef.h"
+#include "nldef.h"
+#include "ifdef.h"
+#include "netiodef.h"
+#include "ddk/wdm.h"
+#include "wine/nsi.h"
+#include "wine/debug.h"
+#include "wine/unixlib.h"
+
+#include "unix_private.h"
+
+WINE_DEFAULT_DEBUG_CHANNEL(nsi);
+
+static NTSTATUS empty_enumerate_all( void *key_data, UINT key_size, void *rw_data, UINT rw_size,
+                                     void *dynamic_data, UINT dynamic_size, void *static_data,
+                                     UINT static_size, UINT_PTR *count )
+{
+    *count = 0;
+    return STATUS_SUCCESS;
+}
+
+static NTSTATUS not_found_get_all_parameters( const void *key, UINT key_size, void *rw_data, UINT rw_size,
+                                              void *dynamic_data, UINT dynamic_size, void *static_data,
+                                              UINT static_size )
+{
+    return STATUS_NOT_FOUND;
+}
+
+static NTSTATUS not_found_get_parameter( const void *key, UINT key_size, UINT param_type,
+                                         void *data, UINT data_size, UINT data_offset )
+{
+    return STATUS_NOT_FOUND;
+}
+
+BOOL convert_unix_name_to_luid( const char *unix_name, NET_LUID *luid )
+{
+    return FALSE;
+}
+
+BOOL convert_luid_to_unix_name( const NET_LUID *luid, const char **unix_name )
+{
+    return FALSE;
+}
+
+static const struct module_table tables[] =
+{
+    {
+        NSI_NDIS_IFINFO_TABLE,
+        {
+            sizeof(NET_LUID), sizeof(struct nsi_ndis_ifinfo_rw),
+            sizeof(struct nsi_ndis_ifinfo_dynamic), sizeof(struct nsi_ndis_ifinfo_static)
+        },
+        empty_enumerate_all,
+        not_found_get_all_parameters,
+        not_found_get_parameter
+    },
+    {
+        NSI_NDIS_INDEX_LUID_TABLE,
+        {
+            sizeof(UINT), 0,
+            0, sizeof(NET_LUID)
+        },
+        NULL,
+        NULL,
+        not_found_get_parameter
+    },
+    { ~0u }
+};
+
+const struct module ndis_module =
+{
+    &NPI_MS_NDIS_MODULEID,
+    tables
+};
+
+#else
+
 #include <stdarg.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -764,3 +853,5 @@ const struct module ndis_module =
     &NPI_MS_NDIS_MODULEID,
     tables
 };
+
+#endif

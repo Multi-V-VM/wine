@@ -323,6 +323,8 @@ static const printenv_t * const all_printenv[] = {&env_x86, &env_x64, &env_ia64,
 
 #ifdef __i386__
 #define env_arch env_x86
+#elif defined(__wasm32__) && defined(PROTON_WASM)
+#define env_arch env_x86
 #elif defined __x86_64__
 #define env_arch env_x64
 #elif defined __arm__

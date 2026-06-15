@@ -30,6 +30,17 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
+#if defined(__wasm32__) && defined(PROTON_WASM)
+typedef int pthread_mutex_t;
+#define PTHREAD_MUTEX_INITIALIZER 0
+static inline int pthread_mutex_init(pthread_mutex_t *mutex, const void *attr) { *mutex = 0; return 0; }
+static inline int pthread_mutex_destroy(pthread_mutex_t *mutex) { return 0; }
+static inline int pthread_mutex_lock(pthread_mutex_t *mutex) { return 0; }
+static inline int pthread_mutex_unlock(pthread_mutex_t *mutex) { return 0; }
+#else
+#include <pthread.h>
+#endif
+
 #include "unix_private.h"
 #include "wine/rbtree.h"
 
@@ -191,7 +202,7 @@ extern bool murmur3_x86_128(void *data_src, data_read_callback read_callback, ui
 #define murmur3_128_state_reset murmur3_x64_128_state_reset
 #define murmur3_128_full        murmur3_x64_128_full
 #define murmur3_128             murmur3_x64_128
-#elif defined(__i386__)
+#elif defined(__i386__) || (defined(__wasm32__) && defined(PROTON_WASM))
 #define murmur3_128_state       murmur3_x86_128_state
 #define murmur3_128_state_init  murmur3_x86_128_state_init
 #define murmur3_128_state_reset murmur3_x86_128_state_reset

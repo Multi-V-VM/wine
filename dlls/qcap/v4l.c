@@ -32,6 +32,8 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#if !defined(__wasm32__) || !defined(PROTON_WASM)
 #include <fcntl.h>
 #include <dlfcn.h>
 #include <sys/ioctl.h>
@@ -45,12 +47,45 @@
 #include <linux/videodev2.h>
 #endif
 #include <unistd.h>
+#endif
 
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
 #include "initguid.h"
 #include "qcap_private.h"
 #include "winternl.h"
+
+#if defined(__wasm32__) && defined(PROTON_WASM)
+
+WINE_DEFAULT_DEBUG_CHANNEL(quartz);
+
+static NTSTATUS v4l_device_unsupported( void *args )
+{
+    FIXME("V4L2 capture is not supported on wasm.\n");
+    return STATUS_NOT_SUPPORTED;
+}
+
+const unixlib_entry_t __wine_unix_call_funcs[] =
+{
+    v4l_device_unsupported,
+    v4l_device_unsupported,
+    v4l_device_unsupported,
+    v4l_device_unsupported,
+    v4l_device_unsupported,
+    v4l_device_unsupported,
+    v4l_device_unsupported,
+    v4l_device_unsupported,
+    v4l_device_unsupported,
+    v4l_device_unsupported,
+    v4l_device_unsupported,
+    v4l_device_unsupported,
+    v4l_device_unsupported,
+    v4l_device_unsupported,
+};
+
+C_ASSERT( ARRAYSIZE(__wine_unix_call_funcs) == unix_funcs_count );
+
+#else
 
 #ifdef HAVE_LINUX_VIDEODEV2_H
 
@@ -956,3 +991,5 @@ C_ASSERT( ARRAYSIZE(__wine_unix_call_wow64_funcs) == unix_funcs_count );
 #endif /* _WIN64 */
 
 #endif /* HAVE_LINUX_VIDEODEV2_H */
+
+#endif /* PROTON_WASM */

@@ -26,14 +26,16 @@
 #include <assert.h>
 #include <errno.h>
 #include <unistd.h>
-#include <sys/socket.h>
 #include <limits.h>
-#ifdef HAVE_LINUX_RTNETLINK_H
-#include <linux/rtnetlink.h>
-#endif
-#ifdef __APPLE__
-#include <sys/ioctl.h>
-#include <sys/kern_event.h>
+#if !(defined(__wasm32__) && defined(PROTON_WASM))
+# include <sys/socket.h>
+# ifdef HAVE_LINUX_RTNETLINK_H
+#  include <linux/rtnetlink.h>
+# endif
+# ifdef __APPLE__
+#  include <sys/ioctl.h>
+#  include <sys/kern_event.h>
+# endif
 #endif
 
 #include "ntstatus.h"
@@ -160,7 +162,7 @@ static NTSTATUS unix_nsi_get_parameter_ex( void *args )
     return nsi_get_parameter_ex( params );
 }
 
-#if defined(HAVE_LINUX_RTNETLINK_H) || defined(__APPLE__)
+#if (defined(HAVE_LINUX_RTNETLINK_H) || defined(__APPLE__)) && !(defined(__wasm32__) && defined(PROTON_WASM))
 static struct
 {
     const NPI_MODULEID *module;

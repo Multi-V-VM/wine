@@ -25,7 +25,9 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#if !(defined(__wasm32__) && defined(PROTON_WASM))
 #include <signal.h>
+#endif
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <limits.h>
@@ -232,7 +234,7 @@ static void release_dir_cache_entry( struct dir *dir )
 
 static void dnotify_adjust_changes( struct dir *dir )
 {
-#if defined(F_SETSIG) && defined(F_NOTIFY)
+#if defined(F_SETSIG) && defined(F_NOTIFY) && !(defined(__wasm32__) && defined(PROTON_WASM))
     int fd = get_unix_fd( dir->fd );
     unsigned int filter = dir->filter;
     unsigned int val;
@@ -263,6 +265,9 @@ static void dnotify_adjust_changes( struct dir *dir )
 /* insert change in the global list */
 static inline void insert_change( struct dir *dir )
 {
+#if defined(__wasm32__) && defined(PROTON_WASM)
+    list_add_head( &change_list, &dir->entry );
+#else
     sigset_t sigset;
 
     sigemptyset( &sigset );
@@ -270,11 +275,15 @@ static inline void insert_change( struct dir *dir )
     sigprocmask( SIG_BLOCK, &sigset, NULL );
     list_add_head( &change_list, &dir->entry );
     sigprocmask( SIG_UNBLOCK, &sigset, NULL );
+#endif
 }
 
 /* remove change from the global list */
 static inline void remove_change( struct dir *dir )
 {
+#if defined(__wasm32__) && defined(PROTON_WASM)
+    list_remove( &dir->entry );
+#else
     sigset_t sigset;
 
     sigemptyset( &sigset );
@@ -282,6 +291,7 @@ static inline void remove_change( struct dir *dir )
     sigprocmask( SIG_BLOCK, &sigset, NULL );
     list_remove( &dir->entry );
     sigprocmask( SIG_UNBLOCK, &sigset, NULL );
+#endif
 }
 
 static void dir_dump( struct object *obj, int verbose )

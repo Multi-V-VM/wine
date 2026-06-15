@@ -24,6 +24,12 @@
 
 #include "config.h"
 
+#if defined(__wasm32__) && defined(PROTON_WASM)
+#define WINE_SERVER_WASM 1
+#else
+#define WINE_SERVER_WASM 0
+#endif
+
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
@@ -48,6 +54,30 @@
 #include "security.h"
 
 #include "winternl.h"
+
+static int chdir_config_dir(void)
+{
+#if WINE_SERVER_WASM
+    const char *config_dir = get_config_dir();
+    if (!config_dir)
+    {
+        errno = ENOENT;
+        return -1;
+    }
+    return chdir( config_dir );
+#else
+    return fchdir( config_dir_fd );
+#endif
+}
+
+static int chdir_server_dir(void)
+{
+#if WINE_SERVER_WASM
+    return chdir( server_dir );
+#else
+    return fchdir( server_dir_fd );
+#endif
+}
 
 struct notify
 {
@@ -1793,9 +1823,16 @@ static void load_keys( struct key *key, const char *filename, FILE *f, int prefi
 static void load_registry( struct key *key, obj_handle_t handle )
 {
     struct file *file;
+#if !WINE_SERVER_WASM
     int fd;
+#endif
 
     if (!(file = get_file_obj( current->process, handle, FILE_READ_DATA ))) return;
+#if WINE_SERVER_WASM
+    set_error( STATUS_NOT_SUPPORTED );
+    release_object( file );
+    return;
+#else
     fd = dup( get_file_unix_fd( file ) );
     release_object( file );
     if (fd != -1)
@@ -1808,6 +1845,7 @@ static void load_registry( struct key *key, obj_handle_t handle )
         }
         else file_set_error();
     }
+#endif
 }
 
 /* load one of the initial registry files */
@@ -1854,6 +1892,8 @@ static void init_supported_machines(void)
     unsigned int count = 0;
 #ifdef __i386__
     if (prefix_type == PREFIX_32BIT) supported_machines[count++] = IMAGE_FILE_MACHINE_I386;
+#elif defined(__wasm32__) && defined(PROTON_WASM)
+    supported_machines[count++] = IMAGE_FILE_MACHINE_I386;
 #elif defined(__x86_64__)
     if (prefix_type == PREFIX_64BIT) supported_machines[count++] = IMAGE_FILE_MACHINE_AMD64;
     supported_machines[count++] = IMAGE_FILE_MACHINE_I386;
@@ -1912,7 +1952,7 @@ void init_registry(void)
 
     /* switch to the config dir */
 
-    if (fchdir( config_dir_fd ) == -1) fatal_error( "chdir to config dir: %s\n", strerror( errno ));
+    if (chdir_config_dir() == -1) fatal_error( "chdir to config dir: %s\n", strerror( errno ));
 
     /* create the root key */
     root_key = create_key_object( NULL, &root_name, OBJ_PERMANENT, 0, current_time, NULL );
@@ -2011,7 +2051,7 @@ void init_registry(void)
     }
 
     /* go back to the server dir */
-    if (fchdir( server_dir_fd ) == -1) fatal_error( "chdir to server dir: %s\n", strerror( errno ));
+    if (chdir_server_dir() == -1) fatal_error( "chdir to server dir: %s\n", strerror( errno ));
 }
 
 /* save a registry branch to a file */
@@ -2169,7 +2209,11 @@ static int save_branch( struct key *key, const char *filename )
 
     for (;;)
     {
+#if WINE_SERVER_WASM
+        snprintf( tmp, sizeof(tmp), "regwasm%04x.tmp", count++ );
+#else
         snprintf( tmp, sizeof(tmp), "reg%lx%04x.tmp", (long) getpid(), count++ );
+#endif
         if ((fd = open( tmp, O_CREAT | O_EXCL | O_WRONLY, 0666 )) != -1) break;
         if (errno != EEXIST) goto done;
         close( fd );
@@ -2211,7 +2255,7 @@ void flush_registry(void)
 {
     int i;
 
-    if (fchdir( config_dir_fd ) == -1) return;
+    if (chdir_config_dir() == -1) return;
     for (i = 0; i < save_branch_count; i++)
     {
         if (!save_branch( save_branch_info[i].key, save_branch_info[i].filename ))
@@ -2221,7 +2265,7 @@ void flush_registry(void)
             perror( " " );
         }
     }
-    if (fchdir( server_dir_fd ) == -1) fatal_error( "chdir to server dir: %s\n", strerror( errno ));
+    if (chdir_server_dir() == -1) fatal_error( "chdir to server dir: %s\n", strerror( errno ));
 }
 
 /* find all the branches inside the specified key or the branch containing the key */

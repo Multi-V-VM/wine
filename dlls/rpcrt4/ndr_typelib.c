@@ -1256,7 +1256,7 @@ static void write_proc_func_header(ITypeInfo *typeinfo, FUNCDESC *desc,
     WRITE_CHAR (proc, *proclen, 0x47);  /* HasExtensions | HasReturn | ClientMustSize | ServerMustSize */
     WRITE_CHAR (proc, *proclen, desc->cParams + 1); /* incl. return value */
 
-#ifdef __i386__
+#if defined(__i386__) || (defined(__wasm32__) && defined(PROTON_WASM))
     WRITE_CHAR (proc, *proclen, 8);  /* extension size */
     WRITE_CHAR (proc, *proclen, 1);  /* HasNewCorrDesc */
     WRITE_SHORT(proc, *proclen, 0);  /* ClientCorrHint */

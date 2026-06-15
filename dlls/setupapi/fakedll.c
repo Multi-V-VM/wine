@@ -40,7 +40,7 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(setupapi);
 
-#ifdef __i386__
+#if defined(__i386__) || (defined(__wasm32__) && defined(PROTON_WASM))
 static const WCHAR pe_dir[] = L"\\i386-windows";
 static const char current_arch[] = "x86";
 #elif defined __x86_64__

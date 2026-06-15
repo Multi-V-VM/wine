@@ -38,10 +38,12 @@
 #endif
 
 #include "mountmgr.h"
+#if !(defined(__wasm32__) && defined(PROTON_WASM))
 #define USE_WS_PREFIX
 #include "winsock2.h"
 #include "ws2ipdef.h"
 #include "dhcpcsdk.h"
+#endif
 #include "unixlib.h"
 
 #include "wine/debug.h"
@@ -241,7 +243,7 @@ void run_diskarbitration_loop(void)
 
 #endif  /* __APPLE__ */
 
-#if defined(__APPLE__)
+#if defined(__APPLE__) && !(defined(__wasm32__) && defined(PROTON_WASM))
 
 static UInt8 map_option( unsigned int option )
 {
@@ -365,7 +367,7 @@ NTSTATUS dhcp_request( void *args )
     return STATUS_SUCCESS;
 }
 
-#elif !defined(SONAME_LIBDBUS_1)
+#elif !defined(SONAME_LIBDBUS_1) || (defined(__wasm32__) && defined(PROTON_WASM))
 
 NTSTATUS dhcp_request( void *args )
 {

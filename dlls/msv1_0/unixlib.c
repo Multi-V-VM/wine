@@ -28,8 +28,10 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
-#include <spawn.h>
-#include <sys/wait.h>
+#if !(defined(__wasm32__) && defined(PROTON_WASM))
+# include <spawn.h>
+# include <sys/wait.h>
+#endif
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
 #include "windef.h"
@@ -145,6 +147,7 @@ static NTSTATUS ntlm_cleanup( void *args )
     close( ctx->pipe_out );
     close( ctx->pipe_in );
 
+#if !(defined(__wasm32__) && defined(PROTON_WASM))
     if (ctx->pid > 0) /* reap child */
     {
         pid_t ret;
@@ -152,6 +155,7 @@ static NTSTATUS ntlm_cleanup( void *args )
             ret = waitpid( ctx->pid, NULL, 0 );
         } while (ret < 0 && errno == EINTR);
     }
+#endif
 
     if (com_buf) free( com_buf->buffer );
     free( com_buf );
@@ -162,6 +166,13 @@ static NTSTATUS ntlm_fork( void *args )
 {
     const struct fork_params *params = args;
     struct ntlm_ctx *ctx = params->ctx;
+#if defined(__wasm32__) && defined(PROTON_WASM)
+    FIXME_(ntlm)( "ntlm_auth helper is not supported on WASI\n" );
+    ctx->pid = -1;
+    ctx->pipe_in = -1;
+    ctx->pipe_out = -1;
+    return SEC_E_UNSUPPORTED_FUNCTION;
+#else
     posix_spawn_file_actions_t file_actions;
     int pipe_in[2], pipe_out[2], err;
     NTSTATUS status = STATUS_SUCCESS;
@@ -216,6 +227,7 @@ static NTSTATUS ntlm_fork( void *args )
     posix_spawn_file_actions_destroy( &file_actions );
 
     return status;
+#endif
 }
 
 const unixlib_entry_t __wine_unix_call_funcs[] =

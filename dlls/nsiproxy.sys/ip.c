@@ -23,6 +23,207 @@
 #endif
 
 #include "config.h"
+
+#if defined(__wasm32__) && defined(PROTON_WASM)
+
+#include <stdarg.h>
+
+#include "ntstatus.h"
+#define WIN32_NO_STATUS
+#include "windef.h"
+#include "winbase.h"
+#include "winternl.h"
+#include "winioctl.h"
+#define USE_WS_PREFIX
+#include "winsock2.h"
+#include "ws2ipdef.h"
+#include "nldef.h"
+#include "ifdef.h"
+#include "ipmib.h"
+#include "netiodef.h"
+#include "wine/nsi.h"
+#include "wine/debug.h"
+
+#include "unix_private.h"
+
+WINE_DEFAULT_DEBUG_CHANNEL(nsi);
+
+struct ipv6_addr_scope *get_ipv6_addr_scope_table( unsigned int *size )
+{
+    *size = 0;
+    return NULL;
+}
+
+UINT find_ipv6_addr_scope( const IN6_ADDR *addr, const struct ipv6_addr_scope *table, unsigned int size )
+{
+    return 0;
+}
+
+static NTSTATUS empty_enumerate_all( void *key_data, UINT key_size, void *rw_data, UINT rw_size,
+                                     void *dynamic_data, UINT dynamic_size, void *static_data,
+                                     UINT static_size, UINT_PTR *count )
+{
+    *count = 0;
+    return STATUS_SUCCESS;
+}
+
+static NTSTATUS unsupported_get_all_parameters( const void *key, UINT key_size, void *rw_data, UINT rw_size,
+                                                void *dynamic_data, UINT dynamic_size, void *static_data,
+                                                UINT static_size )
+{
+    return STATUS_NOT_SUPPORTED;
+}
+
+static const struct module_table ipv4_tables[] =
+{
+    {
+        NSI_IP_COMPARTMENT_TABLE,
+        {
+            sizeof(UINT), sizeof(struct nsi_ip_cmpt_rw),
+            sizeof(struct nsi_ip_cmpt_dynamic), 0
+        },
+        NULL,
+        unsupported_get_all_parameters,
+    },
+    {
+        NSI_IP_ICMPSTATS_TABLE,
+        {
+            0, 0,
+            sizeof(struct nsi_ip_icmpstats_dynamic), 0
+        },
+        NULL,
+        unsupported_get_all_parameters,
+    },
+    {
+        NSI_IP_IPSTATS_TABLE,
+        {
+            0, 0,
+            sizeof(struct nsi_ip_ipstats_dynamic), sizeof(struct nsi_ip_ipstats_static)
+        },
+        NULL,
+        unsupported_get_all_parameters,
+    },
+    {
+        NSI_IP_INTERFACE_TABLE,
+        {
+            sizeof(struct nsi_ip_interface_key), sizeof(struct nsi_ip_interface_rw),
+            sizeof(struct nsi_ip_interface_dynamic), sizeof(struct nsi_ip_interface_static)
+        },
+        empty_enumerate_all,
+        unsupported_get_all_parameters,
+    },
+    {
+        NSI_IP_UNICAST_TABLE,
+        {
+            sizeof(struct nsi_ipv4_unicast_key), sizeof(struct nsi_ip_unicast_rw),
+            sizeof(struct nsi_ip_unicast_dynamic), sizeof(struct nsi_ip_unicast_static)
+        },
+        empty_enumerate_all,
+        unsupported_get_all_parameters,
+    },
+    {
+        NSI_IP_NEIGHBOUR_TABLE,
+        {
+            sizeof(struct nsi_ipv4_neighbour_key), sizeof(struct nsi_ip_neighbour_rw),
+            sizeof(struct nsi_ip_neighbour_dynamic), 0
+        },
+        empty_enumerate_all,
+    },
+    {
+        NSI_IP_FORWARD_TABLE,
+        {
+            sizeof(struct nsi_ipv4_forward_key), sizeof(struct nsi_ip_forward_rw),
+            sizeof(struct nsi_ipv4_forward_dynamic), sizeof(struct nsi_ip_forward_static)
+        },
+        empty_enumerate_all,
+    },
+    {
+        ~0u
+    }
+};
+
+const struct module ipv4_module =
+{
+    &NPI_MS_IPV4_MODULEID,
+    ipv4_tables
+};
+
+static const struct module_table ipv6_tables[] =
+{
+    {
+        NSI_IP_COMPARTMENT_TABLE,
+        {
+            sizeof(UINT), sizeof(struct nsi_ip_cmpt_rw),
+            sizeof(struct nsi_ip_cmpt_dynamic), 0
+        },
+        NULL,
+        unsupported_get_all_parameters,
+    },
+    {
+        NSI_IP_ICMPSTATS_TABLE,
+        {
+            0, 0,
+            sizeof(struct nsi_ip_icmpstats_dynamic), 0
+        },
+        NULL,
+        unsupported_get_all_parameters,
+    },
+    {
+        NSI_IP_IPSTATS_TABLE,
+        {
+            0, 0,
+            sizeof(struct nsi_ip_ipstats_dynamic), sizeof(struct nsi_ip_ipstats_static)
+        },
+        NULL,
+        unsupported_get_all_parameters,
+    },
+    {
+        NSI_IP_INTERFACE_TABLE,
+        {
+            sizeof(struct nsi_ip_interface_key), sizeof(struct nsi_ip_interface_rw),
+            sizeof(struct nsi_ip_interface_dynamic), sizeof(struct nsi_ip_interface_static)
+        },
+        empty_enumerate_all,
+        unsupported_get_all_parameters,
+    },
+    {
+        NSI_IP_UNICAST_TABLE,
+        {
+            sizeof(struct nsi_ipv6_unicast_key), sizeof(struct nsi_ip_unicast_rw),
+            sizeof(struct nsi_ip_unicast_dynamic), sizeof(struct nsi_ip_unicast_static)
+        },
+        empty_enumerate_all,
+        unsupported_get_all_parameters,
+    },
+    {
+        NSI_IP_NEIGHBOUR_TABLE,
+        {
+            sizeof(struct nsi_ipv6_neighbour_key), sizeof(struct nsi_ip_neighbour_rw),
+            sizeof(struct nsi_ip_neighbour_dynamic), 0
+        },
+        empty_enumerate_all,
+    },
+    {
+        NSI_IP_FORWARD_TABLE,
+        {
+            sizeof(struct nsi_ipv6_forward_key), sizeof(struct nsi_ip_forward_rw),
+            sizeof(struct nsi_ipv6_forward_dynamic), sizeof(struct nsi_ip_forward_static)
+        },
+        empty_enumerate_all,
+    },
+    {
+        ~0u
+    }
+};
+
+const struct module ipv6_module =
+{
+    &NPI_MS_IPV6_MODULEID,
+    ipv6_tables
+};
+
+#else
+
 #include <stdarg.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -2000,3 +2201,5 @@ const struct module ipv6_module =
     &NPI_MS_IPV6_MODULEID,
     ipv6_tables
 };
+
+#endif

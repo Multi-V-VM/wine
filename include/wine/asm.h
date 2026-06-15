@@ -316,6 +316,21 @@
                        "movt r0, :upper16:__wine_syscall_dispatcher\n\t" \
                        "ldr r0, [r0]\n\t" \
                        "bx r0" )
+#elif defined(__wasm32__) && defined(PROTON_WASM)
+# define __ASM_SYSCALL_FUNC(id,name,args) \
+    __ASM_BLOCK_BEGIN(__LINE__) \
+    asm( ".functype " __ASM_NAME(#name) " () -> (i32)\n\t" \
+         ".section .text." __ASM_NAME(#name) ",\"\",@\n\t" \
+         ".hidden " __ASM_NAME(#name) "\n\t" \
+         ".globl " __ASM_NAME(#name) "\n\t" \
+         ".type " __ASM_NAME(#name) ",@function\n" \
+         __ASM_NAME(#name) ":\n\t" \
+         ".functype " __ASM_NAME(#name) " () -> (i32)\n\t" \
+         "i32.const 0\n\t" \
+         "return\n\t" \
+         "end_function" ); \
+    __ASM_BLOCK_END
+# define DEFINE_SYSCALL_HELPER32()
 #endif
 
 #endif  /* __WINE_WINE_ASM_H */

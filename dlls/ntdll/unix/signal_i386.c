@@ -2857,3 +2857,125 @@ __ASM_GLOBAL_FUNC( __wine_unix_call_dispatcher,
                    "ret" )
 
 #endif  /* __i386__ */
+
+#ifdef __wasm32__
+
+#include "config.h"
+
+#include <stdarg.h>
+
+#include "ntstatus.h"
+#define WIN32_NO_STATUS
+#include "windef.h"
+#include "winternl.h"
+#include "unix_private.h"
+
+void set_process_instrumentation_callback( void *callback )
+{
+}
+
+NTSTATUS signal_set_full_context( CONTEXT *context )
+{
+    return STATUS_NOT_SUPPORTED;
+}
+
+void *get_native_context( CONTEXT *context )
+{
+    return context;
+}
+
+void *get_wow_context( CONTEXT *context )
+{
+    return NULL;
+}
+
+NTSTATUS WINAPI NtSetContextThread( HANDLE handle, const CONTEXT *context )
+{
+    return STATUS_NOT_SUPPORTED;
+}
+
+NTSTATUS WINAPI NtGetContextThread( HANDLE handle, CONTEXT *context )
+{
+    if (context) context->ContextFlags = 0;
+    return STATUS_NOT_SUPPORTED;
+}
+
+NTSTATUS set_thread_wow64_context( HANDLE handle, const void *ctx, ULONG size )
+{
+    return STATUS_NOT_SUPPORTED;
+}
+
+NTSTATUS get_thread_wow64_context( HANDLE handle, void *ctx, ULONG size )
+{
+    return STATUS_NOT_SUPPORTED;
+}
+
+NTSTATUS get_thread_ldt_entry( HANDLE handle, THREAD_DESCRIPTOR_INFORMATION *info, ULONG len )
+{
+    return STATUS_NOT_SUPPORTED;
+}
+
+NTSTATUS call_user_apc_dispatcher( CONTEXT *context, unsigned int flags, ULONG_PTR arg1, ULONG_PTR arg2,
+                                   ULONG_PTR arg3, PNTAPCFUNC func, NTSTATUS status )
+{
+    return STATUS_NOT_SUPPORTED;
+}
+
+NTSTATUS call_user_exception_dispatcher( EXCEPTION_RECORD *rec, CONTEXT *context )
+{
+    return STATUS_NOT_SUPPORTED;
+}
+
+void call_raise_user_exception_dispatcher(void)
+{
+    abort_thread(1);
+}
+
+NTSTATUS WINAPI NtCallbackReturn( void *ret_ptr, ULONG ret_len, NTSTATUS status )
+{
+    return status;
+}
+
+NTSTATUS KeUserModeCallback( ULONG id, const void *args, ULONG len, void **ret_ptr, ULONG *ret_len )
+{
+    if (ret_ptr) *ret_ptr = NULL;
+    if (ret_len) *ret_len = 0;
+    return STATUS_NOT_SUPPORTED;
+}
+
+void signal_init_threading(void)
+{
+}
+
+void signal_init_process(void)
+{
+}
+
+NTSTATUS signal_alloc_thread( TEB *teb )
+{
+    return STATUS_SUCCESS;
+}
+
+void signal_free_thread( TEB *teb )
+{
+}
+
+void signal_start_thread( PRTL_THREAD_START_ROUTINE entry, void *arg, BOOL suspend, TEB *teb )
+{
+    entry( arg );
+    abort_thread(0);
+}
+
+void __wine_syscall_dispatcher(void)
+{
+}
+
+void __wine_syscall_dispatcher_return(void)
+{
+}
+
+void __wine_unix_call_dispatcher(void)
+{
+}
+
+#endif  /* __wasm32__ */

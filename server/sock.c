@@ -23,6 +23,12 @@
 
 #include "config.h"
 
+#if defined(__wasm32__) && defined(PROTON_WASM)
+#define WINE_SERVER_WASM 1
+#else
+#define WINE_SERVER_WASM 0
+#endif
+
 #include <assert.h>
 #include <fcntl.h>
 #include <stdarg.h>
@@ -119,6 +125,107 @@
 #include "thread.h"
 #include "request.h"
 #include "user.h"
+
+#if WINE_SERVER_WASM
+
+static void socket_device_dump( struct object *obj, int verbose );
+static struct object *socket_device_lookup_name( struct object *obj, struct unicode_str *name,
+                                                 unsigned int attr, struct object *root );
+static struct object *socket_device_open_file( struct object *obj, unsigned int access,
+                                               unsigned int sharing, unsigned int options );
+
+static const struct object_ops socket_device_ops =
+{
+    sizeof(struct object),      /* size */
+    &device_type,               /* type */
+    socket_device_dump,         /* dump */
+    no_add_queue,               /* add_queue */
+    NULL,                       /* remove_queue */
+    NULL,                       /* signaled */
+    no_satisfied,               /* satisfied */
+    no_signal,                  /* signal */
+    no_get_fd,                  /* get_fd */
+    default_get_sync,           /* get_sync */
+    default_map_access,         /* map_access */
+    default_get_sd,             /* get_sd */
+    default_set_sd,             /* set_sd */
+    default_get_full_name,      /* get_full_name */
+    socket_device_lookup_name,  /* lookup_name */
+    directory_link_name,        /* link_name */
+    default_unlink_name,        /* unlink_name */
+    socket_device_open_file,    /* open_file */
+    no_kernel_obj_list,         /* get_kernel_obj_list */
+    no_close_handle,            /* close_handle */
+    no_destroy                  /* destroy */
+};
+
+void sock_init(void)
+{
+}
+
+static void socket_device_dump( struct object *obj, int verbose )
+{
+    fputs( "Socket device\n", stderr );
+}
+
+static struct object *socket_device_lookup_name( struct object *obj, struct unicode_str *name,
+                                                 unsigned int attr, struct object *root )
+{
+    if (name) name->len = 0;
+    return NULL;
+}
+
+static struct object *socket_device_open_file( struct object *obj, unsigned int access,
+                                               unsigned int sharing, unsigned int options )
+{
+    set_error( STATUS_NOT_SUPPORTED );
+    return NULL;
+}
+
+struct object *create_socket_device( struct object *root, const struct unicode_str *name,
+                                     unsigned int attr, const struct security_descriptor *sd )
+{
+    return create_named_object( root, &socket_device_ops, name, attr, sd );
+}
+
+DECL_HANDLER(recv_socket)
+{
+    set_error( STATUS_NOT_SUPPORTED );
+}
+
+DECL_HANDLER(send_socket)
+{
+    set_error( STATUS_NOT_SUPPORTED );
+}
+
+DECL_HANDLER(socket_get_events)
+{
+    reply->flags = 0;
+    set_error( STATUS_NOT_SUPPORTED );
+}
+
+DECL_HANDLER(socket_send_icmp_id)
+{
+    set_error( STATUS_NOT_SUPPORTED );
+}
+
+DECL_HANDLER(socket_get_icmp_id)
+{
+    reply->icmp_id = 0;
+    set_error( STATUS_NOT_FOUND );
+}
+
+DECL_HANDLER(get_tcp_connections)
+{
+    reply->count = 0;
+}
+
+DECL_HANDLER(get_udp_endpoints)
+{
+    reply->count = 0;
+}
+
+#else
 
 #if defined(linux) && !defined(IP_UNICAST_IF)
 #define IP_UNICAST_IF 50
@@ -4451,3 +4558,5 @@ DECL_HANDLER(get_udp_endpoints)
         enum_handles_of_type( &sock_ops, enum_udp_endpoints, &info );
     }
 }
+
+#endif

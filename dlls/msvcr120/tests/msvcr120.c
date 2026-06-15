@@ -38,9 +38,17 @@
 
 #include <locale.h>
 
+#if defined(__wasm32__) && defined(PROTON_WASM)
+_ACRTIMP float __cdecl __nexttowardf(float, double);
+_ACRTIMP double __cdecl __nexttoward(double, double);
+#define nexttowardf __nexttowardf
+#define nexttoward  __nexttoward
+#define nexttowardl __nexttoward
+#else
 _ACRTIMP float __cdecl nexttowardf(float, double);
 _ACRTIMP double __cdecl nexttoward(double, double);
 _ACRTIMP double __cdecl nexttowardl(double, double);
+#endif
 
 #define _MAX__TIME64_T     (((__time64_t)0x00000007 << 32) | 0x93406FFF)
 

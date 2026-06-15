@@ -20,10 +20,20 @@
 
 #include "config.h"
 
+#if defined(__wasm32__) && defined(PROTON_WASM)
+#define WINE_SERVER_WASM 1
+#define SIGUSR1 0
+#define SIGQUIT 0
+#else
+#define WINE_SERVER_WASM 0
+#endif
+
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
+#if !WINE_SERVER_WASM
 #include <signal.h>
+#endif
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -510,6 +520,10 @@ struct thread *create_thread( int fd, struct process *process, const struct secu
 
     if (fd == -1)
     {
+#if WINE_SERVER_WASM
+        set_error( STATUS_NOT_SUPPORTED );
+        return NULL;
+#else
         if (pipe( request_pipe ) == -1)
         {
             file_set_error();
@@ -523,6 +537,7 @@ struct thread *create_thread( int fd, struct process *process, const struct secu
         }
         close( request_pipe[1] );
         fd = request_pipe[0];
+#endif
     }
 
     if (process->is_terminating)

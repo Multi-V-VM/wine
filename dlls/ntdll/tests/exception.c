@@ -36,6 +36,15 @@
 #include "wine/test.h"
 #include "intrin.h"
 
+#if defined(__wasm32__) && defined(PROTON_WASM)
+
+START_TEST(exception)
+{
+    win_skip("ntdll exception tests require native exception/unwind support on wasm.\n");
+}
+
+#else
+
 static void *code_mem;
 static HMODULE hntdll;
 static BOOL is_arm64ec;
@@ -12945,3 +12954,5 @@ START_TEST(exception)
     test_RtlAddVectoredExceptionHandler();
     VirtualFree(code_mem, 0, MEM_RELEASE);
 }
+
+#endif  /* __wasm32__ && PROTON_WASM */

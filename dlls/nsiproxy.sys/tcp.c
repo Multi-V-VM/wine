@@ -24,6 +24,93 @@
 #endif
 
 #include "config.h"
+
+#if defined(__wasm32__) && defined(PROTON_WASM)
+
+#include <stdarg.h>
+
+#include "ntstatus.h"
+#define WIN32_NO_STATUS
+#include "windef.h"
+#include "winbase.h"
+#include "winternl.h"
+#define USE_WS_PREFIX
+#include "winsock2.h"
+#include "ws2ipdef.h"
+#include "ifdef.h"
+#include "netiodef.h"
+#include "tcpmib.h"
+#include "wine/nsi.h"
+#include "wine/debug.h"
+#include "wine/server.h"
+
+#include "unix_private.h"
+
+WINE_DEFAULT_DEBUG_CHANNEL(nsi);
+
+static NTSTATUS empty_enumerate_all( void *key_data, UINT key_size, void *rw_data, UINT rw_size,
+                                     void *dynamic_data, UINT dynamic_size, void *static_data,
+                                     UINT static_size, UINT_PTR *count )
+{
+    *count = 0;
+    return STATUS_SUCCESS;
+}
+
+static NTSTATUS unsupported_get_all_parameters( const void *key, UINT key_size, void *rw_data, UINT rw_size,
+                                                void *dynamic_data, UINT dynamic_size, void *static_data,
+                                                UINT static_size )
+{
+    return STATUS_NOT_SUPPORTED;
+}
+
+static const struct module_table tcp_tables[] =
+{
+    {
+        NSI_TCP_STATS_TABLE,
+        {
+            sizeof(USHORT), 0,
+            sizeof(struct nsi_tcp_stats_dynamic), sizeof(struct nsi_tcp_stats_static)
+        },
+        NULL,
+        unsupported_get_all_parameters,
+    },
+    {
+        NSI_TCP_ALL_TABLE,
+        {
+            sizeof(struct nsi_tcp_conn_key), 0,
+            sizeof(struct nsi_tcp_conn_dynamic), sizeof(struct nsi_tcp_conn_static)
+        },
+        empty_enumerate_all,
+    },
+    {
+        NSI_TCP_ESTAB_TABLE,
+        {
+            sizeof(struct nsi_tcp_conn_key), 0,
+            sizeof(struct nsi_tcp_conn_dynamic), sizeof(struct nsi_tcp_conn_static)
+        },
+        empty_enumerate_all,
+    },
+    {
+        NSI_TCP_LISTEN_TABLE,
+        {
+            sizeof(struct nsi_tcp_conn_key), 0,
+            sizeof(struct nsi_tcp_conn_dynamic), sizeof(struct nsi_tcp_conn_static)
+        },
+        empty_enumerate_all,
+    },
+    {
+        ~0u
+    }
+};
+
+const struct module tcp_module =
+{
+    &NPI_MS_TCP_MODULEID,
+    tcp_tables
+};
+
+#else
+
 #include <stdarg.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -468,3 +555,5 @@ const struct module tcp_module =
     &NPI_MS_TCP_MODULEID,
     tcp_tables
 };
+
+#endif

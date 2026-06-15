@@ -20,11 +20,19 @@
 
 #include "config.h"
 
+#if defined(__wasm32__) && defined(PROTON_WASM)
+#define WINE_SERVER_WASM 1
+#else
+#define WINE_SERVER_WASM 0
+#endif
+
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
+#if !WINE_SERVER_WASM
 #include <signal.h>
+#endif
 #include <stdarg.h>
 #include <sys/types.h>
 #include <unistd.h>

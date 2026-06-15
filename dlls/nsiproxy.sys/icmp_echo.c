@@ -22,6 +22,55 @@
 #endif
 
 #include "config.h"
+
+#if defined(__wasm32__) && defined(PROTON_WASM)
+
+#include <stdarg.h>
+
+#include "ntstatus.h"
+#define WIN32_NO_STATUS
+#include "windef.h"
+#include "winbase.h"
+#include "winternl.h"
+#include "winioctl.h"
+#define USE_WS_PREFIX
+#include "winsock2.h"
+#include "ddk/wdm.h"
+#include "ifdef.h"
+#include "netiodef.h"
+#include "ipexport.h"
+#include "ipmib.h"
+#include "wine/nsi.h"
+#include "wine/debug.h"
+
+#include "nsiproxy_private.h"
+#include "unix_private.h"
+
+WINE_DEFAULT_DEBUG_CHANNEL(nsi);
+
+NTSTATUS icmp_send_echo( void *args )
+{
+    FIXME( "ICMP echo is not supported on WASI\n" );
+    return STATUS_NOT_SUPPORTED;
+}
+
+NTSTATUS icmp_listen( void *args )
+{
+    return STATUS_NOT_SUPPORTED;
+}
+
+NTSTATUS icmp_cancel_listen( void *args )
+{
+    return STATUS_SUCCESS;
+}
+
+NTSTATUS icmp_close( void *args )
+{
+    return STATUS_SUCCESS;
+}
+
+#else
+
 #include <stdarg.h>
 
 #include <stdlib.h>
@@ -1023,3 +1072,5 @@ NTSTATUS icmp_close( void *args )
     handle_free( params->handle );
     return STATUS_SUCCESS;
 }
+
+#endif

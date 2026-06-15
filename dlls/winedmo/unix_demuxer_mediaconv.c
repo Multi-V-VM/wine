@@ -23,7 +23,9 @@
 #include "config.h"
 #include "unix_private.h"
 
+#if !defined(__wasm32__) || !defined(PROTON_WASM)
 #include <pthread.h>
+#endif
 
 #include "media-converter/media-converter.h"
 #include "wine/debug.h"

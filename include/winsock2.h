@@ -627,7 +627,11 @@ typedef struct WS(fd_set)
 {
     WS(u_int) fd_count;
     SOCKET fd_array[WS(FD_SETSIZE)];
+#if defined(USE_WS_PREFIX) && defined(__wasm32__) && defined(PROTON_WASM)
+} WS(fd_set), *PFD_SET, *LPFD_SET;
+#else
 } WS(fd_set), FD_SET, *PFD_SET, *LPFD_SET;
+#endif
 
 #endif
 

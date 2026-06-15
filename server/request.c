@@ -20,13 +20,21 @@
 
 #include "config.h"
 
+#if defined(__wasm32__) && defined(PROTON_WASM)
+#define WINE_SERVER_WASM 1
+#else
+#define WINE_SERVER_WASM 0
+#endif
+
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #ifdef HAVE_PWD_H
 #include <pwd.h>
 #endif
+#if !WINE_SERVER_WASM
 #include <signal.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -35,7 +43,9 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#if !WINE_SERVER_WASM
 #include <sys/wait.h>
+#endif
 #ifdef HAVE_SYS_UIO_H
 #include <sys/uio.h>
 #endif
@@ -124,9 +134,15 @@ timeout_t server_start_time = 0;  /* server startup time */
 char *server_dir = NULL;   /* server directory */
 int server_dir_fd = -1;    /* file descriptor for the server dir */
 int config_dir_fd = -1;    /* file descriptor for the config dir */
+static char *config_dir_name;
 
 static struct master_socket *master_socket;  /* the master socket object */
 static struct timeout_user *master_timeout;
+
+const char *get_config_dir(void)
+{
+    return config_dir_name;
+}
 
 /* complain about a protocol error and terminate the client connection */
 void fatal_protocol_error( struct thread *thread, const char *err, ... )
@@ -376,6 +392,11 @@ error:
 /* receive a file descriptor on the process socket */
 int receive_fd( struct process *process )
 {
+#if WINE_SERVER_WASM
+    (void)process;
+    set_error( STATUS_NOT_SUPPORTED );
+    return -1;
+#else
     struct iovec vec;
     struct send_fd data;
     struct msghdr msghdr;
@@ -451,11 +472,19 @@ int receive_fd( struct process *process )
         }
     }
     return -1;
+#endif
 }
 
 /* send an fd to a client */
 int send_client_fd( struct process *process, int fd, obj_handle_t handle )
 {
+#if WINE_SERVER_WASM
+    (void)process;
+    (void)fd;
+    (void)handle;
+    set_error( STATUS_NOT_SUPPORTED );
+    return -1;
+#else
     struct iovec vec;
     struct msghdr msghdr;
     char cmsg_buffer[256];
@@ -503,6 +532,7 @@ int send_client_fd( struct process *process, int fd, obj_handle_t handle )
         kill_process( process, 1 );
     }
     return -1;
+#endif
 }
 
 /* return a monotonic time counter */
@@ -617,7 +647,9 @@ static void create_dir( const char *name, struct stat *st )
             fatal_error( "lstat %s: %s\n", name, strerror( errno ));
     }
     if (!S_ISDIR(st->st_mode)) fatal_error( "%s is not a directory\n", name );
+#if !WINE_SERVER_WASM
     if (st->st_uid != getuid()) fatal_error( "%s is not owned by you\n", name );
+#endif
     if (st->st_mode & 077) fatal_error( "%s must not be accessible by other users\n", name );
 }
 
@@ -641,11 +673,13 @@ static char *create_server_dir( int force )
     else
     {
         const char *home = getenv( "HOME" );
+#if !WINE_SERVER_WASM
         if (!home)
         {
             struct passwd *pwd = getpwuid( getuid() );
             if (pwd) home = pwd->pw_dir;
         }
+#endif
         if (!home) fatal_error( "could not determine your home directory\n" );
         if (home[0] != '/') fatal_error( "your home directory %s is not an absolute path\n", home );
         if (!(config_dir = malloc( strlen(home) + sizeof("/.wine") ))) fatal_error( "out of memory\n" );
@@ -663,12 +697,17 @@ static char *create_server_dir( int force )
         fatal_error( "open %s: %s\n", config_dir, strerror( errno ));
     if (fstat( config_dir_fd, &st ) == -1)
         fatal_error( "stat %s: %s\n", config_dir, strerror( errno ));
+#if !WINE_SERVER_WASM
     if (st.st_uid != getuid())
         fatal_error( "%s is not owned by you\n", config_dir );
+#endif
 
     /* create the base directory if needed */
 
 #ifdef __ANDROID__  /* there's no /tmp dir on Android */
+    if (asprintf( &base_dir, "%s/.wineserver", config_dir ) == -1)
+        fatal_error( "out of memory\n" );
+#elif WINE_SERVER_WASM
     if (asprintf( &base_dir, "%s/.wineserver", config_dir ) == -1)
         fatal_error( "out of memory\n" );
 #else
@@ -694,12 +733,16 @@ static char *create_server_dir( int force )
     if (st.st_dev != st2.st_dev || st.st_ino != st2.st_ino)
         fatal_error( "chdir did not end up in %s\n", server_dir );
 
+    free( config_dir_name );
+    if (!(config_dir_name = strdup( config_dir ))) fatal_error( "out of memory\n" );
+
     free( base_dir );
     free( config_dir );
     return server_dir;
 }
 
 /* create the lock file and return its file descriptor */
+#if !WINE_SERVER_WASM
 static int create_server_lock(void)
 {
     struct stat st;
@@ -720,10 +763,14 @@ static int create_server_lock(void)
         fatal_error( "error creating %s/%s: %s\n", server_dir, server_lock_name, strerror( errno ));
     return fd;
 }
+#endif
 
 /* wait for the server lock */
 int wait_for_lock(void)
 {
+#if WINE_SERVER_WASM
+    return 0;
+#else
     int fd, r;
     struct flock fl;
 
@@ -740,11 +787,16 @@ int wait_for_lock(void)
     close(fd);
 
     return r;
+#endif
 }
 
 /* kill the wine server holding the lock */
 int kill_lock_owner( int sig )
 {
+#if WINE_SERVER_WASM
+    (void)sig;
+    return 0;
+#else
     int fd, i, ret = 0;
     pid_t pid = 0;
     struct flock fl;
@@ -786,15 +838,21 @@ int kill_lock_owner( int sig )
  done:
     close( fd );
     return ret;
+#endif
 }
 
 /* acquire the main server lock */
 static void acquire_lock(void)
 {
+#if !WINE_SERVER_WASM
     struct sockaddr_un addr;
     struct stat st;
     struct flock fl;
-    int fd, slen, got_lock = 0;
+#endif
+    int fd;
+#if !WINE_SERVER_WASM
+    int slen;
+    int got_lock = 0;
 
     fd = create_server_lock();
 
@@ -837,7 +895,12 @@ static void acquire_lock(void)
         /* it seems we can't use locks on this fs, so we will use the socket existence as lock */
         close( fd );
     }
+#else
+    unlink( server_socket_name );
+    if ((fd = open( "/dev/null", O_RDONLY )) == -1) fatal_error( "open /dev/null: %s\n", strerror( errno ));
+#endif
 
+#if !WINE_SERVER_WASM
     if ((fd = socket( AF_UNIX, SOCK_STREAM, 0 )) == -1) fatal_error( "socket: %s\n", strerror( errno ));
     addr.sun_family = AF_UNIX;
     strcpy( addr.sun_path, server_socket_name );
@@ -849,8 +912,10 @@ static void acquire_lock(void)
     {
         if ((errno == EEXIST) || (errno == EADDRINUSE))
         {
+#if !WINE_SERVER_WASM
             if (got_lock)
                 fatal_error( "couldn't bind to the socket even though we hold the lock\n" );
+#endif
             exit(2); /* we didn't get the lock, exit with special status */
         }
         fatal_error( "bind: %s\n", strerror( errno ));
@@ -858,6 +923,7 @@ static void acquire_lock(void)
     atexit( socket_cleanup );
     chmod( server_socket_name, 0600 );  /* make sure no other user can connect */
     if (listen( fd, 5 ) == -1) fatal_error( "listen: %s\n", strerror( errno ));
+#endif
 
     if (!(master_socket = alloc_object( &master_socket_ops )) ||
         !(master_socket->fd = create_anonymous_fd( &master_socket_fd_ops, fd, &master_socket->obj, 0 )))
@@ -869,8 +935,11 @@ static void acquire_lock(void)
 /* open the master server socket and start waiting for new clients */
 void open_master_socket(void)
 {
-    int fd, pid, status, sync_pipe[2];
+    int fd;
+#if !WINE_SERVER_WASM
+    int pid, status, sync_pipe[2];
     char dummy;
+#endif
 
     /* make sure no request is larger than the maximum size */
     assert( sizeof(union generic_request) == sizeof(struct request_max_size) );
@@ -878,10 +947,13 @@ void open_master_socket(void)
 
     /* make sure the stdio fds are open */
     fd = open( "/dev/null", O_RDWR );
+#if !WINE_SERVER_WASM
     while (fd >= 0 && fd <= 2) fd = dup( fd );
+#endif
 
     server_dir = create_server_dir( 1 );
 
+#if !WINE_SERVER_WASM
     if (!foreground)
     {
         if (pipe( sync_pipe ) == -1) fatal_error( "pipe: %s\n", strerror( errno ));
@@ -921,6 +993,7 @@ void open_master_socket(void)
         }
     }
     else  /* remain in the foreground */
+#endif
     {
         acquire_lock();
     }
@@ -935,7 +1008,14 @@ static void close_socket_timeout( void *arg )
 {
     master_timeout = NULL;
     flush_registry();
-    if (debug_level) fprintf( stderr, "wineserver: exiting (pid=%ld)\n", (long) getpid() );
+    if (debug_level)
+    {
+#if WINE_SERVER_WASM
+        fprintf( stderr, "wineserver: exiting (pid=wasm)\n" );
+#else
+        fprintf( stderr, "wineserver: exiting (pid=%ld)\n", (long) getpid() );
+#endif
+    }
 
 #ifdef DEBUG_OBJECTS
     close_objects();  /* shut down everything properly */

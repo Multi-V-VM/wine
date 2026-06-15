@@ -20,6 +20,12 @@
 
 #include "config.h"
 
+#if defined(__wasm32__) && defined(PROTON_WASM)
+#define WINE_SERVER_WASM 1
+#else
+#define WINE_SERVER_WASM 0
+#endif
+
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -28,7 +34,9 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#if !WINE_SERVER_WASM
 #include <sys/mman.h>
+#endif
 #include <unistd.h>
 #ifdef HAVE_LINUX_MEMFD_H
 # include <linux/memfd.h>
@@ -274,6 +282,10 @@ static inline mem_size_t round_size( mem_size_t size, mem_size_t mask )
 
 static void free_available_high_map_addr( client_ptr_t base, mem_size_t size )
 {
+#if WINE_SERVER_WASM
+    (void)base;
+    (void)size;
+#else
     unsigned int flags = MAP_PRIVATE | MAP_ANON;
 
 #ifdef MAP_FIXED_NOREPLACE
@@ -292,6 +304,7 @@ static void free_available_high_map_addr( client_ptr_t base, mem_size_t size )
         base >>= 1;
         size >>= 1;
     }
+#endif
 }
 
 void init_memory(void)
@@ -366,6 +379,7 @@ static int make_temp_file( char name[16] )
 }
 
 /* check if the current directory allows exec mappings */
+#if !WINE_SERVER_WASM
 static int check_current_dir_for_exec(void)
 {
     int fd;
@@ -383,6 +397,7 @@ static int check_current_dir_for_exec(void)
     unlink( tmpfn );
     return (ret != MAP_FAILED);
 }
+#endif
 
 /* create a temp file for anonymous mappings */
 static int create_temp_file( file_pos_t size )
@@ -401,6 +416,7 @@ static int create_temp_file( file_pos_t size )
     if (temp_dir_fd == -1)
     {
         temp_dir_fd = server_dir_fd;
+#if !WINE_SERVER_WASM
         if (!check_current_dir_for_exec())
         {
             /* the server dir is noexec, try the config dir instead */
@@ -410,8 +426,11 @@ static int create_temp_file( file_pos_t size )
             else  /* neither works, fall back to server dir */
                 fchdir( server_dir_fd );
         }
+#endif
     }
+#if !WINE_SERVER_WASM
     else if (temp_dir_fd != server_dir_fd) fchdir( temp_dir_fd );
+#endif
 
     fd = make_temp_file( tmpfn );
     if (fd != -1)
@@ -425,7 +444,9 @@ static int create_temp_file( file_pos_t size )
     }
     else file_set_error();
 
+#if !WINE_SERVER_WASM
     if (temp_dir_fd != server_dir_fd) fchdir( server_dir_fd );
+#endif
     return fd;
 }
 
@@ -1383,17 +1404,27 @@ struct mapping *create_session_mapping( struct object *root, const struct unicod
 
 void set_session_mapping( struct mapping *mapping )
 {
+#if !WINE_SERVER_WASM
     int unix_fd = get_unix_fd( mapping->fd );
+#endif
     size_t size = mapping->size;
     struct session_block *block;
     void *tmp;
 
     if (!(block = mem_alloc( sizeof(*block) ))) return;
+#if WINE_SERVER_WASM
+    if (!(tmp = calloc( 1, size )))
+    {
+        free( block );
+        return;
+    }
+#else
     if ((tmp = mmap( NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, unix_fd, 0 )) == MAP_FAILED)
     {
         free( block );
         return;
     }
+#endif
 
     block->data = tmp;
     block->offset = 0;
@@ -1420,12 +1451,20 @@ static struct session_block *grow_session_mapping( mem_size_t needed )
     if (!grow_file( unix_fd, new_size )) return NULL;
 
     if (!(block = mem_alloc( sizeof(*block) ))) return NULL;
+#if WINE_SERVER_WASM
+    if (!(tmp = calloc( 1, new_size - old_size )))
+    {
+        free( block );
+        return NULL;
+    }
+#else
     if ((tmp = mmap( NULL, new_size - old_size, PROT_READ | PROT_WRITE, MAP_SHARED, unix_fd, old_size )) == MAP_FAILED)
     {
         file_set_error();
         free( block );
         return NULL;
     }
+#endif
 
     block->data = tmp;
     block->offset = old_size;
@@ -1527,13 +1566,19 @@ struct obj_locator get_shared_object_locator( volatile void *object_shm )
 struct object *create_user_data_mapping( struct object *root, const struct unicode_str *name,
                                         unsigned int attr, const struct security_descriptor *sd )
 {
+#if !WINE_SERVER_WASM
     void *ptr;
+#endif
     struct mapping *mapping;
 
     if (!(mapping = create_mapping( root, name, attr, sizeof(KUSER_SHARED_DATA),
                                     SEC_COMMIT, 0, FILE_READ_DATA | FILE_WRITE_DATA, sd ))) return NULL;
+#if WINE_SERVER_WASM
+    user_shared_data = calloc( 1, mapping->size );
+#else
     ptr = mmap( NULL, mapping->size, PROT_WRITE, MAP_SHARED, get_unix_fd( mapping->fd ), 0 );
     if (ptr != MAP_FAILED) user_shared_data = ptr;
+#endif
     return &mapping->obj;
 }
 

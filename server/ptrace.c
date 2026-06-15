@@ -20,14 +20,24 @@
 
 #include "config.h"
 
+#if defined(__wasm32__) && defined(PROTON_WASM)
+#define WINE_SERVER_WASM 1
+#else
+#define WINE_SERVER_WASM 0
+#endif
+
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
+#if !WINE_SERVER_WASM
 #include <signal.h>
+#endif
 #include <stdarg.h>
 #include <sys/types.h>
+#if !WINE_SERVER_WASM
 #include <sys/wait.h>
+#endif
 #ifdef HAVE_SYS_PTRACE_H
 # include <sys/ptrace.h>
 #endif
@@ -55,6 +65,57 @@
 #include "file.h"
 #include "process.h"
 #include "thread.h"
+
+#if WINE_SERVER_WASM
+
+void sigchld_callback(void)
+{
+}
+
+void init_tracing_mechanism(void)
+{
+}
+
+void init_process_tracing( struct process *process )
+{
+}
+
+void finish_process_tracing( struct process *process )
+{
+}
+
+int send_thread_signal( struct thread *thread, int sig )
+{
+    return 0;
+}
+
+int read_process_memory( struct process *process, client_ptr_t ptr, data_size_t size, char *dest )
+{
+    set_error( STATUS_ACCESS_DENIED );
+    return 0;
+}
+
+int write_process_memory( struct process *process, client_ptr_t ptr, data_size_t size, const char *src,
+                          data_size_t *written )
+{
+    if (written) *written = 0;
+    set_error( STATUS_ACCESS_DENIED );
+    return 0;
+}
+
+void init_thread_context( struct thread *thread )
+{
+}
+
+void get_thread_context( struct thread *thread, struct context_data *context, unsigned int flags )
+{
+}
+
+void set_thread_context( struct thread *thread, const struct context_data *context, unsigned int flags )
+{
+}
+
+#else
 
 #ifdef USE_PTRACE
 
@@ -856,3 +917,5 @@ void set_thread_context( struct thread *thread, const struct context_data *conte
 #endif  /* linux || __FreeBSD__ */
 
 #endif  /* USE_PTRACE */
+
+#endif

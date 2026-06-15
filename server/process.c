@@ -20,11 +20,19 @@
 
 #include "config.h"
 
+#if defined(__wasm32__) && defined(PROTON_WASM)
+#define WINE_SERVER_WASM 1
+#else
+#define WINE_SERVER_WASM 0
+#endif
+
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
+#if !WINE_SERVER_WASM
 #include <signal.h>
+#endif
 #include <string.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -626,6 +634,11 @@ static void process_died( struct process *process )
 static void process_sigkill( void *private )
 {
     struct process *process = private;
+#if WINE_SERVER_WASM
+    process->sigkill_delay = TICKS_PER_SEC / 64;
+    process->sigkill_timeout = NULL;
+    process_died( process );
+#else
     int signal = 0;
 
     process->sigkill_delay *= 2;
@@ -640,6 +653,7 @@ static void process_sigkill( void *private )
         process->sigkill_timeout = NULL;
         process_died( process );
     }
+#endif
 }
 
 /* start the sigkill timer for a process upon exit */

@@ -21,12 +21,20 @@
 
 #include "config.h"
 
+#if defined(__wasm32__) && defined(PROTON_WASM)
+#define WINE_SERVER_WASM 1
+#else
+#define WINE_SERVER_WASM 0
+#endif
+
 #include <assert.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
+#if !WINE_SERVER_WASM
 #include <signal.h>
+#endif
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
@@ -92,6 +100,18 @@
 #ifdef HAVE_SYS_EXTATTR_H
 #undef XATTR_ADDITIONAL_OPTIONS
 #include <sys/extattr.h>
+#endif
+
+#if WINE_SERVER_WASM
+#ifndef F_RDLCK
+#define F_RDLCK 0
+#endif
+#ifndef F_WRLCK
+#define F_WRLCK 1
+#endif
+#ifndef F_UNLCK
+#define F_UNLCK 2
+#endif
 #endif
 
 #include "ntstatus.h"
@@ -326,6 +346,17 @@ static const struct object_ops file_lock_ops =
 #define FILE_POS_T_MAX  (~(file_pos_t)0)
 
 static file_pos_t max_unix_offset = OFF_T_MAX;
+
+static int server_dup_fd( int fd )
+{
+#if WINE_SERVER_WASM
+    (void)fd;
+    errno = ENOSYS;
+    return -1;
+#else
+    return dup( fd );
+#endif
+}
 
 #define DUMP_LONG_LONG(val) do { \
     if (sizeof(val) > sizeof(unsigned long) && (val) > ~0UL) \
@@ -1281,6 +1312,13 @@ static void file_lock_destroy( struct object *obj )
 /* set (or remove) a Unix lock if possible for the given range */
 static int set_unix_lock( struct fd *fd, file_pos_t start, file_pos_t end, int type )
 {
+#if WINE_SERVER_WASM
+    (void)fd;
+    (void)start;
+    (void)end;
+    (void)type;
+    return 1;
+#else
     struct flock fl;
 
     if (!fd->fs_locks) return 1;  /* no fs locks possible for this fd */
@@ -1341,6 +1379,7 @@ static int set_unix_lock( struct fd *fd, file_pos_t start, file_pos_t end, int t
             return 0;
         }
     }
+#endif
 }
 
 /* check if interval [start;end) overlaps the lock */
@@ -1822,7 +1861,7 @@ struct fd *dup_fd_object( struct fd *orig, unsigned int access, unsigned int sha
     {
         struct closed_fd *closed = mem_alloc( sizeof(*closed) );
         if (!closed) goto failed;
-        if ((fd->unix_fd = dup( orig->unix_fd )) == -1)
+        if ((fd->unix_fd = server_dup_fd( orig->unix_fd )) == -1)
         {
             file_set_error();
             free( closed );
@@ -1840,7 +1879,7 @@ struct fd *dup_fd_object( struct fd *orig, unsigned int access, unsigned int sha
             goto failed;
         }
     }
-    else if ((fd->unix_fd = dup( orig->unix_fd )) == -1)
+    else if ((fd->unix_fd = server_dup_fd( orig->unix_fd )) == -1)
     {
         file_set_error();
         goto failed;
@@ -1935,7 +1974,11 @@ struct fd *open_fd( struct fd *root, const char *name, struct unicode_str nt_nam
     struct stat st;
     struct closed_fd *closed_fd;
     struct fd *fd;
+#if !WINE_SERVER_WASM
     int root_fd = -1;
+#else
+    char *wasm_root_name = NULL;
+#endif
     int rw_mode;
     char *path;
 
@@ -1957,6 +2000,14 @@ struct fd *open_fd( struct fd *root, const char *name, struct unicode_str nt_nam
 
     if (root)
     {
+#if WINE_SERVER_WASM
+        if (!(wasm_root_name = dup_fd_name( root, name )))
+        {
+            set_error( STATUS_NO_MEMORY );
+            goto error;
+        }
+        name = wasm_root_name;
+#else
         if ((root_fd = get_unix_fd( root )) == -1) goto error;
         if (fchdir( root_fd ) == -1)
         {
@@ -1964,6 +2015,7 @@ struct fd *open_fd( struct fd *root, const char *name, struct unicode_str nt_nam
             root_fd = -1;
             goto error;
         }
+#endif
     }
 
     /* create the directory if needed */
@@ -2026,7 +2078,13 @@ struct fd *open_fd( struct fd *root, const char *name, struct unicode_str nt_nam
             goto error;
         }
 
-        if ((path = dup_fd_name( root, name )))
+        if ((path =
+#if WINE_SERVER_WASM
+             strdup( name )
+#else
+             dup_fd_name( root, name )
+#endif
+            ))
         {
             fd->unix_name = realpath( path, NULL );
             free( path );
@@ -2101,13 +2159,21 @@ struct fd *open_fd( struct fd *root, const char *name, struct unicode_str nt_nam
     }
 #endif
 
+#if WINE_SERVER_WASM
+    free( wasm_root_name );
+#else
     if (root_fd != -1) fchdir( server_dir_fd ); /* go back to the server dir */
+#endif
     return fd;
 
 error:
     release_object( fd );
     free( closed_fd );
+#if WINE_SERVER_WASM
+    free( wasm_root_name );
+#else
     if (root_fd != -1) fchdir( server_dir_fd ); /* go back to the server dir */
+#endif
     return NULL;
 }
 
@@ -2352,7 +2418,7 @@ static int is_dir_empty( int fd )
     int empty;
     struct dirent *de;
 
-    if ((fd = dup( fd )) == -1)
+    if ((fd = server_dup_fd( fd )) == -1)
         return -1;
 
     if (!(dir = fdopendir( fd )))

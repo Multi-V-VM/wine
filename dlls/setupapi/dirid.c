@@ -45,7 +45,7 @@ struct user_dirid
     WCHAR *str;
 };
 
-#ifdef __i386__
+#if defined(__i386__) || (defined(__wasm32__) && defined(PROTON_WASM))
 static const WCHAR printer_env[] = L"w32x86";
 #elif defined __x86_64__
 static const WCHAR printer_env[] = L"x64";

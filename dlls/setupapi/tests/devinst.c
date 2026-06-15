@@ -3307,7 +3307,7 @@ static void test_device_install_params(void)
     SetupDiDestroyDeviceInfoList(set);
 }
 
-#ifdef __i386__
+#if defined(__i386__) || (defined(__wasm32__) && defined(PROTON_WASM))
 #define MYEXT "x86"
 #define WOWEXT "AMD64"
 #define WRONGEXT "ARM"

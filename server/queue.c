@@ -20,6 +20,12 @@
 
 #include "config.h"
 
+#if defined(__wasm32__) && defined(PROTON_WASM)
+#define WINE_SERVER_WASM 1
+#else
+#define WINE_SERVER_WASM 0
+#endif
+
 #include <assert.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -3227,6 +3233,9 @@ DECL_HANDLER(set_queue_fd)
 
     if ((unix_fd = get_file_unix_fd( file )) != -1)
     {
+#if WINE_SERVER_WASM
+        set_error( STATUS_NOT_SUPPORTED );
+#else
         if ((unix_fd = dup( unix_fd )) != -1)
         {
             queue->fd = create_anonymous_fd( &msg_queue_fd_ops, unix_fd, &queue->obj, 0 );
@@ -3234,6 +3243,7 @@ DECL_HANDLER(set_queue_fd)
         }
         else
             file_set_error();
+#endif
     }
     release_object( file );
 }

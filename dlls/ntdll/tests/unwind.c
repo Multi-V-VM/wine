@@ -33,7 +33,7 @@
 #include "rtlsupportapi.h"
 #include "wine/test.h"
 
-#ifndef __i386__
+#if !defined(__i386__) && !(defined(__wasm32__) && defined(PROTON_WASM))
 
 static void *code_mem;
 static HMODULE ntdll;

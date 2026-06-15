@@ -137,7 +137,7 @@ extern void heap_thread_detach(void);
 
 /* register context */
 
-#ifdef __i386__
+#if defined(__i386__) || (defined(__wasm32__) && defined(PROTON_WASM))
 # define TRACE_CONTEXT(c) do { \
     TRACE( "eip=%08lx esp=%08lx ebp=%08lx eflags=%08lx\n", (c)->Eip, (c)->Esp, (c)->Ebp, (c)->EFlags );\
     TRACE( "eax=%08lx ebx=%08lx ecx=%08lx edx=%08lx\n", (c)->Eax, (c)->Ebx, (c)->Ecx, (c)->Edx ); \

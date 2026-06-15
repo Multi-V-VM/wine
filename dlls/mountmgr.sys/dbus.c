@@ -27,25 +27,29 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
-#include <dlfcn.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#ifdef SONAME_LIBDBUS_1
+#if !(defined(__wasm32__) && defined(PROTON_WASM))
+# include <dlfcn.h>
+# include <sys/socket.h>
+# include <netinet/in.h>
+# include <arpa/inet.h>
+#endif
+#if defined(SONAME_LIBDBUS_1) && !(defined(__wasm32__) && defined(PROTON_WASM))
 # include <dbus/dbus.h>
 #endif
 
 #include "mountmgr.h"
+#if !(defined(__wasm32__) && defined(PROTON_WASM))
 #define USE_WS_PREFIX
 #include "winsock2.h"
 #include "dhcpcsdk.h"
+#endif
 #include "unixlib.h"
 
 #include "wine/debug.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(mountmgr);
 
-#ifdef SONAME_LIBDBUS_1
+#if defined(SONAME_LIBDBUS_1) && !(defined(__wasm32__) && defined(PROTON_WASM))
 
 #define DBUS_FUNCS               \
     DO_FUNC(dbus_bus_add_match); \
@@ -834,11 +838,11 @@ NTSTATUS dhcp_request( void *args )
 }
 #endif
 
-#else  /* SONAME_LIBDBUS_1 */
+#else  /* SONAME_LIBDBUS_1 && !PROTON_WASM */
 
 void run_dbus_loop(void)
 {
     TRACE( "Skipping, DBUS support not compiled in\n" );
 }
 
-#endif  /* SONAME_LIBDBUS_1 */
+#endif  /* SONAME_LIBDBUS_1 && !PROTON_WASM */

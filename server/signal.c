@@ -20,7 +20,15 @@
 
 #include "config.h"
 
+#if defined(__wasm32__) && defined(PROTON_WASM)
+#define WINE_SERVER_WASM 1
+#else
+#define WINE_SERVER_WASM 0
+#endif
+
+#if !WINE_SERVER_WASM
 #include <signal.h>
+#endif
 #include <stdio.h>
 #include <sys/time.h>
 #include <poll.h>
@@ -34,6 +42,27 @@
 #include "process.h"
 #include "thread.h"
 #include "request.h"
+
+#if WINE_SERVER_WASM
+
+void start_watchdog(void)
+{
+}
+
+void stop_watchdog(void)
+{
+}
+
+int watchdog_triggered(void)
+{
+    return 0;
+}
+
+void init_signals(void)
+{
+}
+
+#else
 
 #if defined(linux) && defined(__SIGRTMIN)
 /* the signal used by linuxthreads as exit signal for clone() threads */
@@ -323,3 +352,5 @@ error:
     fprintf( stderr, "failed to initialize signal handlers\n" );
     exit(1);
 }
+
+#endif

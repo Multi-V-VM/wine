@@ -101,6 +101,14 @@
     T(992) T(993) T(994) T(995) T(996) T(997) T(998) T(999) T(1000) T(1001) T(1002) T(1003) T(1004) T(1005) T(1006) T(1007) \
     T(1008) T(1009) T(1010) T(1011) T(1012) T(1013) T(1014) T(1015) T(1016) T(1017) T(1018) T(1019) T(1020) T(1021) T(1022) T(1023)
 
+#if defined(__wasm32__) && defined(PROTON_WASM)
+
+#define T(num) void ObjectStublessClient##num(void) {}
+ALL_THUNK_ENTRIES
+#undef T
+
+#else
+
 #ifdef __i386__
 
 __ASM_GLOBAL_FUNC( call_stubless_func,
@@ -235,12 +243,22 @@ __ASM_GLOBAL_FUNC( stubless_thunks, ALL_THUNK_ENTRIES )
 
 #undef T
 
+#endif
+
 
 /* The idea here is to replace the first param on the stack
    ie. This (which will point to cstdstubbuffer_delegating_t)
    with This->stub_buffer.pvServerObject and then jump to the
    relevant offset in This->stub_buffer.pvServerObject's vtbl.
 */
+#if defined(__wasm32__) && defined(PROTON_WASM)
+
+#define T(num) void NdrProxyForwardingFunction##num(void) {}
+ALL_THUNK_ENTRIES
+#undef T
+
+#else
+
 #ifdef __i386__
 
 #define T(num) \
@@ -291,6 +309,8 @@ __ASM_GLOBAL_FUNC( stubless_thunks, ALL_THUNK_ENTRIES )
 __ASM_GLOBAL_FUNC( vtbl_thunks, ALL_THUNK_ENTRIES )
 
 #undef T
+
+#endif
 
 static HRESULT WINAPI delegating_QueryInterface(IUnknown *pUnk, REFIID iid, void **ppv)
 {
@@ -513,4 +533,10 @@ __ASM_GLOBAL_FUNC( call_server_func,
                    "ldp x19, x20, [sp, #0x10]\n\t"
                    "ldp x29, x30, [sp], #0x20\n\t"
                    "ret" )
+#elif defined(__wasm32__) && defined(PROTON_WASM)
+LONG_PTR CDECL call_server_func(SERVER_ROUTINE func, unsigned char *args, unsigned int stack_size,
+                                const NDR_PROC_PARTIAL_OIF_HEADER *header)
+{
+    return 0;
+}
 #endif
